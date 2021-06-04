@@ -1,0 +1,31 @@
+{
+    "name": "pixijs-typescript-starter",
+    "version": "0.0.1",
+    "description": "A boilerplate to start developping a PixiJS game or animation using TypeScript (VS Code & Chrome).",
+    "scripts": {
+        "dev": "webpack-dev-server -d"
+    },
+    "author": "Guillaume DESFORGES <aceus02@gmail.com>",
+    "license": "MIT",
+    "devDependencies": {
+        "@typescript-eslint/eslint-plugin": "^4.26.0",
+        "@typescript-eslint/parser": "^4.26.0",
+        "clean-webpack-plugin": "^3.0.0",
+        "copy-webpack-plugin": "5.1.1",
+        "eslint": "^7.27.0",
+        "eslint-config-standard": "^16.0.3",
+        "eslint-plugin-import": "^2.23.4",
+        "eslint-plugin-node": "^11.1.0",
+        "eslint-plugin-promise": "^5.1.0",
+        "html-webpack-plugin": "4.0.4",
+        "prettier": "2.0.4",
+        "ts-loader": "6.2.2",
+        "typescript": "3.8.3",
+        "webpack": "4.42.1",
+        "webpack-cli": "3.3.11",
+        "webpack-dev-server": "^3.10.3"
+    },
+    "dependencies": {
+        "pixi.js": "5.2.1"
+    }
+}
