@@ -5,13 +5,13 @@ import * as PIXI from 'pixi.js'
    */
 class State {
   name: any;
-  sharedProps: Map<string, any>;
+  context: Map<string, any>;
   /**
      * constructor of InsertPoint
-     * @param {Map} sharedProps The properties will be used in every state.
+     * @param {Map} context The properties will be used in every state.
      */
-  constructor (sharedProps: Map<string, any>) {
-    this.sharedProps = sharedProps
+  constructor (context: Map<string, any>) {
+    this.context = context
   }
 
   /**
@@ -39,18 +39,24 @@ class State {
 }
 /** Class controls The states. */
 class StateCtrl {
-  sharedProps: Map<string, any>;
+  context: Map<string, any>;
   states: Map<string, State>
   currState: State;
   /**
        * constructor of StateCtrl
        */
   constructor () {
-    this.sharedProps = new Map()
-    this.sharedProps.set('app', undefined)
+    // Settle the context for manipulation.
+    this.context = new Map()
+    this.context.set('controller', this)
+    this.context.set('app', undefined)
+    this.context.set('numPoint', 0)
+    this.context.set('numShape', 0)
+    // Create all state in advance.
     this.states = new Map()
-    this.currState = new InsertPoint(this.sharedProps)
+    this.currState = new InsertPoint(this.context)
     this.states.set('insertPoint', this.currState)
+    this.states.set('insertLine', new InsertLine(this.context))
   }
 
   /**
@@ -58,7 +64,7 @@ class StateCtrl {
      * @param {PIXI.Application} app the application of PIXI engine
      */
   injectApp (app:PIXI.Application) {
-    this.sharedProps.set('app', app)
+    this.context.set('app', app)
     // Default state is Insert Point
     this.currState = this.states.get('insertPoint')!
     this.currState.enter('none')
@@ -82,19 +88,15 @@ class StateCtrl {
    * The class describes the state of editor when a point should be inserted
    */
 class InsertPoint extends State {
-  shapeCount: number;
-  pointCount: number;
   app?: PIXI.Application;
   onClick: () => void;
   onClickHandler: () => void;
   /**
      * constructor of InsertPoint
-     * @param {Map} sharedProps The properties will be used in every state.
+     * @param {Map} context The properties will be used in every state.
      */
-  constructor (sharedProps: Map<string, any>) {
-    super(sharedProps)
-    this.shapeCount = 0
-    this.pointCount = 0
+  constructor (context: Map<string, any>) {
+    super(context)
     this.onClick = function () {
       if (this.app === undefined) {
         return
@@ -102,20 +104,25 @@ class InsertPoint extends State {
       const mousePos = this.app.renderer.plugins.interaction.mouse.global
       // TODO: Use command pattern
       // Create a root entity
-      this.shapeCount++
+      const numPoint = this.context.get('numPoint')
+      const numShape = this.context.get('numShape')
       const newShape = new PIXI.Container()
-      newShape.name = 'shape' + this.shapeCount
+      newShape.name = 'shape' + numShape
+      this.context.set('numShape', numShape + 1)
       const graphics = new PIXI.Graphics()
-      graphics.name = 'point' + this.pointCount
-      this.pointCount++
+      graphics.name = 'point' + numPoint
+      this.context.set('numPoint', numPoint + 1)
       // Draw a basic point
       graphics.lineStyle(0)
       graphics.beginFill(0xDE3249)
       graphics.drawCircle(mousePos.x, mousePos.y, 5)
       graphics.endFill()
+      graphics.cacheAsBitmap = true
       newShape.addChild(graphics)
       this.app.stage.addChild(newShape)
-      this.sharedProps.set('lastPoint', new PIXI.Point(mousePos.x, mousePos.y))
+      this.context.set('lastPoint', new PIXI.Point(mousePos.x, mousePos.y))
+      const ctrl:StateCtrl = this.context.get('controller')!
+      ctrl.change('insertLine')
     }
     this.onClickHandler = this.onClick.bind(this)
   }
@@ -125,11 +132,11 @@ class InsertPoint extends State {
      * @param {string} nextState Notice the state which one is next.
      * @return {boolean} whether the state is able to jump to the next state.
      */
-  allow (nextState: string) {
+  allow (nextState: string): boolean {
     // TODO: Use strategy pattern
     switch (nextState) {
-      case 'Select':
-        break
+      case 'insertLine':
+        return true
       default:
     }
     return false
@@ -137,10 +144,10 @@ class InsertPoint extends State {
 
   /**
      * Callback when state starts
-     * @param {string} _prevState Notice the state which state has been switched.
+     * @param {string} prevState Notice the state which state has been switched.
      */
   enter (prevState:string) {
-    this.app = this.sharedProps.get('app')
+    this.app = this.context.get('app')
     if (this.app !== undefined) {
       this.app.renderer.view.addEventListener('click', this.onClickHandler)
     }
@@ -152,7 +159,101 @@ class InsertPoint extends State {
      */
   exit (nextState:string) {
     if (this.app !== undefined) {
-      this.app.renderer.view.addEventListener('click', this.onClickHandler)
+      this.app.renderer.view.removeEventListener('click', this.onClickHandler)
+    }
+  }
+}
+
+/**
+   * The class describes the state of editor when a line should be inserted
+   */
+class InsertLine extends State {
+  app?: PIXI.Application;
+  helpLine? : PIXI.Graphics;
+  onClick: () => void;
+  onClickHandler: () => void;
+  onUpdate: () => void;
+  onUpdateHandler: () => void;
+  onKeyUp: (e: KeyboardEvent) => void;
+  onKeyUpHandler: (e: KeyboardEvent) => void;
+
+  /**
+     * constructor of InsertPoint
+     * @param {Map} context The properties will be used in every state.
+     */
+  constructor (context: Map<string, any>) {
+    super(context)
+    this.onKeyUp = function (e:KeyboardEvent) {
+      if (e.defaultPrevented) {
+        return
+      }
+      if (e.key === 'Esc' || e.key === 'Escape') {
+        const ctrl:StateCtrl = this.context.get('controller')!
+        ctrl.change('insertPoint')
+      }
+    }
+    this.onClick = function () {
+    }
+    this.onUpdate = function () {
+      if (this.app !== undefined) {
+        const helpLine = this.helpLine!
+        const lastPoint = this.context.get('lastPoint')
+        const mousePos = this.app.renderer.plugins.interaction.mouse.global
+        helpLine.clear()
+        helpLine.lineStyle(10, 0xff0000, 0.8, 1, true)
+        helpLine.moveTo(lastPoint.x, lastPoint.y)
+        helpLine.lineTo(mousePos.x, mousePos.y)
+      }
+    }
+    this.onKeyUpHandler = this.onKeyUp.bind(this)
+    this.onClickHandler = this.onClick.bind(this)
+    this.onUpdateHandler = this.onUpdate.bind(this)
+  }
+
+  /**
+     * Confirm there is a directly connect to next state
+     * @param {string} nextState Notice the state which one is next.
+     * @return {boolean} whether the state is able to jump to the next state.
+     */
+  allow (nextState: string): boolean {
+    // TODO: Use strategy pattern
+    switch (nextState) {
+      case 'insertPoint':
+        return true
+      default:
+    }
+    return false
+  };
+
+  /**
+     * Callback when state starts
+     * @param {string} prevState Notice the state which state has been switched.
+     */
+  enter (prevState:string) {
+    this.app = this.context.get('app')
+    if (this.app !== undefined) {
+      if (this.helpLine === undefined) {
+        this.helpLine = new PIXI.Graphics()
+        this.app.stage.addChild(this.helpLine)
+      } else {
+        this.helpLine.clear()
+      }
+      this.app.ticker.add(this.onUpdateHandler)
+      window.addEventListener('keyup', this.onKeyUpHandler)
+    }
+  }
+
+  /**
+     * Callback when state exit
+     * @param {string} nextState Notice the state which one is next.
+     */
+  exit (nextState:string) {
+    if (this.app !== undefined) {
+      this.app.ticker.remove(this.onUpdateHandler)
+      if (this.helpLine !== undefined) {
+        this.helpLine.clear()
+      }
+      window.removeEventListener('keyup', this.onKeyUpHandler)
     }
   }
 }

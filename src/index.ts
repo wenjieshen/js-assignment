@@ -1,8 +1,10 @@
 import * as PIXI from 'pixi.js'
 import { StateCtrl } from './state'
+
+const backgroundPath = 'assets/Green_3_gridbox.png'
 const load = (app: PIXI.Application) => {
   return new Promise<void>((resolve) => {
-    app.loader.add('assets/hello-world.png').load(() => {
+    app.loader.add(backgroundPath).load(() => {
       resolve()
     })
   })
@@ -22,35 +24,37 @@ const main = async () => {
 
   // Load assets
   await load(app)
-  const sprite = new PIXI.Sprite(
-    app.loader.resources['assets/hello-world.png'].texture
+  const background = new PIXI.TilingSprite(
+    app.loader.resources[backgroundPath].texture,
+    window.innerWidth,
+    window.innerWidth
   )
-  sprite.x = window.innerWidth / 2 - sprite.width / 2
-  sprite.y = window.innerHeight / 2 - sprite.height / 2
-  app.stage.addChild(sprite)
+  background.tileScale.x *= 0.1
+  background.tileScale.y *= 0.1
+  app.stage.addChild(background)
 
   // Handle window resizing
   window.addEventListener('resize', (e) => {
     app.renderer.resize(window.innerWidth, window.innerHeight)
-    sprite.x = window.innerWidth / 2 - sprite.width / 2
-    sprite.y = window.innerHeight / 2 - sprite.height / 2
+    background.width = window.innerWidth
+    background.height = window.innerHeight
   })
 
   document.body.appendChild(app.view)
 
-  const context = {
-    velocity: { x: 1, y: 1},
-    sprite
+  /* const context = {
+    velocity: { x: 1, y: 1 },
+    sprite: background
   }
 
-  app.ticker.add(update, context)
+  app.ticker.add(update, context) */
 
   const stateCtrl = new StateCtrl()
   stateCtrl.injectApp(app)
 }
 
 // Cannot be an arrow function. Arrow functions cannot have a 'this' parameter.
-function update (this: any, delta: number) {
+/* function update (this: any, delta: number) {
   if (this.sprite.x <= 0 || this.sprite.x >= window.innerWidth - this.sprite.width) {
     this.velocity.x = -this.velocity.x
   }
@@ -59,6 +63,6 @@ function update (this: any, delta: number) {
   }
   this.sprite.x += this.velocity.x
   this.sprite.y += this.velocity.y
-};
+}; */
 
 main()
