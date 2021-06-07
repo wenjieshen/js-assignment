@@ -1,4 +1,5 @@
 
+import Quadtree from '@timohausmann/quadtree-js'
 import * as PIXI from 'pixi.js'
 import { State } from './state'
 import { SimplePath, SimpleNode, StateCtrl } from './stateControl'
@@ -7,9 +8,10 @@ import * as UTILITY from './utility'
    * The class describes the state of editor when a line should be inserted
    */
 class InsertLine extends State {
+    name = 'InsertLine'
     app?: PIXI.Application;
     helpLine? : PIXI.Graphics;
-    currGraph? : SimplePath;
+    currGraph : SimplePath|null = null;
     paths?: SimplePath[];
     onClick: () => void;
     onClickHandler: () => void;
@@ -37,9 +39,10 @@ class InsertLine extends State {
         if (e.key === 'Esc' || e.key === 'Escape') {
           if (this.app === undefined) return
           const lastPoint:PIXI.Graphics = this.context.get('lastPoint')!
-          if (this.currGraph === undefined) {
+          if (this.currGraph === null) {
             this.app.stage.removeChild(lastPoint)
           }
+          this.currGraph = null
           this.context.set('lastPoint', undefined)
           const ctrl:StateCtrl = this.context.get('controller')!
           ctrl.change('insertPoint')
@@ -50,8 +53,10 @@ class InsertLine extends State {
         const lastPoint:PIXI.Graphics = this.context.get('lastPoint')!
         const mapping:Map<PIXI.Graphics, SimpleNode> = this.context.get('mapping')!
         const owner:Map<SimpleNode, SimplePath> = this.context.get('owner')!
+        const pointTree:Quadtree = this.context.get('pointTree')!
+        const lineTree:Quadtree = this.context.get('lineTree')!
         // Create a new graph if this is the first line
-        if (this.currGraph === undefined) {
+        if (this.currGraph === null) {
           this.currGraph = UTILITY.AddNewGraph(lastPoint, this.app.stage, owner, mapping)
           this.context.set('currentGraph', this.currGraph)
           this.context.get('paths').push(this.currGraph)
@@ -66,7 +71,7 @@ class InsertLine extends State {
         newEntity.x = mousePos.x
         newEntity.y = mousePos.y
         const parent:SimpleNode = mapping.get(lastPoint)!
-        this.currGraph!.addNewPoint(newEntity, owner, mapping, parent)
+        this.currGraph!.addNewPoint(newEntity, owner, mapping, parent, pointTree, lineTree)
         UTILITY.DrawSolidPoint(newEntity)
         this.app.stage.addChild(newEntity)
 
@@ -113,6 +118,9 @@ class InsertLine extends State {
     enter (prevState:string) {
       this.app = this.context.get('app')!
       this.paths = this.context.get('paths')!
+      if (prevState === 'InsertPoint') {
+        this.currGraph = null
+      }
       if (this.app !== undefined) {
         if (this.helpLine === undefined) {
           this.helpLine = new PIXI.Graphics()

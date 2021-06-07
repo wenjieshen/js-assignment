@@ -6,6 +6,7 @@ import { SimplePath, StateCtrl } from './stateControl'
    * The class describes the state of editor when a line should be inserted
    */
 class ConnectPoint extends State {
+    name = 'ConnectPoint'
     app?: PIXI.Application;
     helpLine? : PIXI.Graphics;
     helpCircle? : PIXI.Graphics;
@@ -44,7 +45,6 @@ class ConnectPoint extends State {
         if (this.app === undefined) return
         const currGraph:SimplePath = this.context.get('currentGraph')!
         currGraph!.isClosed = true
-        currGraph.buildKdTree()
         const ctrl:StateCtrl = this.context.get('controller')!
         ctrl.change('insertPoint')
       }

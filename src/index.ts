@@ -1,6 +1,5 @@
 import * as PIXI from 'pixi.js'
 import { StateCtrl } from './stateControl'
-
 const backgroundPath = 'assets/Green_3_gridbox.png'
 const load = (app: PIXI.Application) => {
   return new Promise<void>((resolve) => {
@@ -32,7 +31,6 @@ const main = async () => {
   background.tileScale.x *= 0.1
   background.tileScale.y *= 0.1
   app.stage.addChild(background)
-
   // Handle window resizing
   window.addEventListener('resize', (e) => {
     app.renderer.resize(window.innerWidth, window.innerHeight)

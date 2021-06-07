@@ -3,12 +3,16 @@ import { State } from './state'
 import { InsertPoint } from './stateInsertPoint'
 import { InsertLine } from './stateInsertLine'
 import { ConnectPoint } from './stateConnectPoint'
-import { SimplePath, SimpleNode } from './simplePath'
+import { SimplePath, SimpleNode, SimpleLine } from './simplePath'
+import Quadtree from '@timohausmann/quadtree-js'
+
 /** Class controls The states. */
 class StateCtrl {
     context: Map<string, any>;
     states: Map<string, State>
     currState: State;
+    pointTree?: Quadtree;
+    lineTree?: Quadtree;
     /**
          * constructor of StateCtrl
          */
@@ -34,6 +38,10 @@ class StateCtrl {
        */
     injectApp (app:PIXI.Application) {
       this.context.set('app', app)
+      this.pointTree = new Quadtree({ x: 0, y: 0, width: app.renderer.width, height: app.renderer.height })
+      this.context.set('pointTree', this.pointTree)
+      this.lineTree = new Quadtree({ x: 0, y: 0, width: app.renderer.width, height: app.renderer.height })
+      this.context.set('lineTree', this.lineTree)
       // Default state is Insert Point
       this.currState = this.states.get('insertPoint')!
       this.currState.enter('none')
@@ -57,5 +65,6 @@ class StateCtrl {
 export {
   StateCtrl,
   SimplePath,
-  SimpleNode
+  SimpleNode,
+  SimpleLine
 }

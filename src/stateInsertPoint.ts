@@ -7,6 +7,7 @@ import * as UTILITY from './utility'
    * The class describes the state of editor when a point should be inserted
    */
 class InsertPoint extends State {
+    name = 'InsertPoint'
     app?: PIXI.Application;
     onClick: () => void;
     onClickHandler: () => void;
