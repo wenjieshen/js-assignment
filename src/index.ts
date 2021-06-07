@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import { StateCtrl } from './state'
+import { StateCtrl } from './stateControl'
 
 const backgroundPath = 'assets/Green_3_gridbox.png'
 const load = (app: PIXI.Application) => {
