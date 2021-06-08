@@ -1,6 +1,7 @@
 import * as PIXI from 'pixi.js'
+import { Context } from './context'
 import { State } from './state'
-import { StateCtrl } from './stateControl'
+import { SimpleNode, SimplePath } from './stateControl'
 import * as UTILITY from './utility'
 
 /**
@@ -15,7 +16,7 @@ class InsertPoint extends State {
        * constructor of InsertPoint
        * @param {Map} context The properties will be used in every state.
        */
-    constructor (context: Map<string, any>) {
+    constructor (context: Context) {
       super(context)
       this.onClick = function () {
         if (this.app === undefined) {
@@ -31,9 +32,13 @@ class InsertPoint extends State {
         pointEntity.x = mousePos.x
         pointEntity.y = mousePos.y
         console.log(pointEntity.x, pointEntity.y)
-        this.context.set('lastPoint', pointEntity)
-        const ctrl:StateCtrl = this.context.get('controller')!
-        ctrl.change('insertLine')
+        // Create a current path
+        const head = new SimpleNode(pointEntity)
+        this.context.mapping.set(pointEntity, head)
+        this.context.currentPath = new SimplePath(head, this.app.stage.addChild(new PIXI.Graphics()))
+        this.context.owner.set(head, this.context.currentPath)
+        //
+        this.context.controller.change('insertLine')
       }
       this.onClickHandler = this.onClick.bind(this)
     }
@@ -58,10 +63,9 @@ class InsertPoint extends State {
        * @param {string} prevState Notice the state which state has been switched.
        */
     enter (prevState:string) {
-      this.app = this.context.get('app')
-      if (this.app !== undefined) {
-        this.app.renderer.view.addEventListener('click', this.onClickHandler)
-      }
+      this.app = this.context.app!
+      this.context.currentPath = null
+      this.app.renderer.view.addEventListener('click', this.onClickHandler)
     }
 
     /**
