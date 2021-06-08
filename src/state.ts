@@ -1,14 +1,15 @@
+import { Context } from './context'
 /**
    * The class describes the state of the editor
    */
 class State {
   name: any;
-  context: Map<string, any>;
+  context: Context;
   /**
      * constructor of InsertPoint
-     * @param {Map} context The properties will be used in every state.
+     * @param {Context} context The properties will be used in every state.
      */
-  constructor (context: Map<string, any>) {
+  constructor (context: Context) {
     this.context = context
   }
 

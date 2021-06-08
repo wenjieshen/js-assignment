@@ -1,7 +1,9 @@
 
 import * as PIXI from 'pixi.js'
+import { Context } from './context'
 import { State } from './state'
 import { SimplePath, StateCtrl } from './stateControl'
+import { BeforeDeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
@@ -24,7 +26,7 @@ class ConnectPoint extends State {
        * constructor of InsertPoint
        * @param {Map} context The properties will be used in every state.
        */
-    constructor (context: Map<string, any>) {
+    constructor (context: Context) {
       super(context)
       this.onKeyUp = function (e:KeyboardEvent) {
         if (e.defaultPrevented) {
@@ -32,26 +34,26 @@ class ConnectPoint extends State {
         }
         if (e.key === 'Esc' || e.key === 'Escape') {
           if (this.app === undefined) return
-          const lastPoint:PIXI.Graphics = this.context.get('lastPoint')!
-          if (this.context.get('currentGraph') === undefined) {
-            this.app.stage.removeChild(lastPoint)
+          if (this.context.currentPath!.count === 1) {
+            BeforeDeletePath(this.context, this.context.currentPath!)
+            delete this.context.currentPath
+            this.context.currentPath = null
           }
-          this.context.set('lastPoint', undefined)
-          const ctrl:StateCtrl = this.context.get('controller')!
+          const ctrl:StateCtrl = this.context.controller
           ctrl.change('insertPoint')
         }
       }
       this.onClick = function () {
         if (this.app === undefined) return
-        const currGraph:SimplePath = this.context.get('currentGraph')!
-        currGraph!.isClosed = true
-        const ctrl:StateCtrl = this.context.get('controller')!
+        const currGraph:SimplePath = this.context.currentPath!
+        currGraph!.closePath(this.context.lineTree!)
+        const ctrl:StateCtrl = this.context.controller
         ctrl.change('insertPoint')
       }
       this.onUpdate = function () {
         if (this.app !== undefined) {
           const helpLine = this.helpLine!
-          const lastPoint = this.context.get('lastPoint')
+          const lastPoint:PIXI.Graphics = this.context.currentPath!.tail.data
           const mousePos = this.app.renderer.plugins.interaction.mouse.global
           helpLine.clear()
           helpLine.lineStyle(15, 0x000000, 0.8, 1, true)
@@ -67,7 +69,7 @@ class ConnectPoint extends State {
         }
       }
       this.onMouseOut = function () {
-        const ctrl:StateCtrl = this.context.get('controller')!
+        const ctrl:StateCtrl = this.context.controller
         ctrl.change('insertLine')
       }
       this.onMouseOutHander = this.onMouseOut.bind(this)
@@ -99,7 +101,7 @@ class ConnectPoint extends State {
        * @param {string} prevState Notice the state which state has been switched.
        */
     enter (prevState:string) {
-      this.app = this.context.get('app')
+      this.app = this.context.app!
       if (this.app !== undefined) {
         if (this.helpLine === undefined) {
           this.helpLine = new PIXI.Graphics()
@@ -114,7 +116,7 @@ class ConnectPoint extends State {
           this.helpCircle.clear()
         }
         // Helper
-        this.mouseTarget = this.context.get('mouseTarget')!
+        this.mouseTarget = this.context.currentPath!.head.data
         this.mouseTarget!.tint = 0xC0392B
         // Helper
         this.helpCircle.lineStyle(3, 0x2E86C1)
@@ -149,7 +151,6 @@ class ConnectPoint extends State {
         window.removeEventListener('keyup', this.onKeyUpHandler)
         this.mouseTarget?.removeListener('mouseout', this.onMouseOutHander)
         this.mouseTarget!.tint = 0xFFFFFF
-        this.context.set('mouseTarget', undefined)
       }
     }
 }

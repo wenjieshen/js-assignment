@@ -27,6 +27,7 @@ class SimpleLine {
   p1: PIXI.Point;
   aabbMax: PIXI.Point = new PIXI.Point();
   aabbMin: PIXI.Point = new PIXI.Point();
+  intersectedLine: Map<SimpleLine, PIXI.Point> = new Map<SimpleLine, PIXI.Point>()
   constructor (p0: PIXI.Point, p1: PIXI.Point) {
     this.p0 = p0
     this.p1 = p1
@@ -36,7 +37,7 @@ class SimpleLine {
     this.aabbMin.y = Math.min(p0.y, p1.y)
   }
 
-  intersect (line :SimpleLine, point:PIXI.Point) {
+  intersect (line :SimpleLine) {
     // https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect/1968345#1968345
     const p2 = line.p0; const p3 = line.p1
     //
@@ -51,8 +52,8 @@ class SimpleLine {
 
     if (s >= 0 && s <= 1 && t >= 0 && t <= 1) {
       // Collision detected
-      point.x = this.p0.x + (t * s1X)
-      point.y = this.p0.y + (t * s1Y)
+      const point = new PIXI.Point(this.p0.x + (t * s1X), this.p0.y + (t * s1Y))
+      this.intersectedLine.set(line, point)
       return true
     }
 
@@ -64,29 +65,38 @@ interface LineTreeNode extends Rect {
 }
 class SimplePath {
     head:SimpleNode;
+    tail:SimpleNode;
+    count = 0
     points:SimpleNode[];
     paint:PIXI.Graphics;
-    isClosed:boolean;
     lines:SimpleLine[];
+    mapping:Map<SimpleNode, SimpleLine> = new Map<SimpleNode, SimpleLine>();
     aabbMax: PIXI.Point = new PIXI.Point();
     aabbMin:PIXI.Point = new PIXI.Point();
     sum:number = 0;
     constructor (head:SimpleNode, paint:PIXI.Graphics) {
       this.head = head
+      this.tail = head
       this.points = []
       this.lines = []
       this.points.push(head)
       this.paint = paint
-      this.isClosed = false
+      this.count = 1
+      this.aabbMax.x = head.data.x
+      this.aabbMax.y = head.data.y
+      this.aabbMin.x = head.data.x
+      this.aabbMin.y = head.data.y
     }
 
-    addNewPoint (graphics:PIXI.Graphics, owner:Map<SimpleNode, SimplePath>, mapping:Map<PIXI.Graphics, SimpleNode>, parent:SimpleNode, pointTree:Quadtree, lineTree:Quadtree) {
+    addNewPoint (graphics:PIXI.Graphics, pointTree: Quadtree, lineTree: Quadtree) {
+      this.count += 1
       const node = new SimpleNode(graphics)
-      mapping.set(graphics, node)
       const currIdx = this.points.push(node)
       node.idx = currIdx
-      owner.set(node, this)
-      parent.insert(node)
+      // Insert into my data structure
+      this.tail.insert(node)
+      this.tail = this.tail.next
+      // Insert into quadtree
       const pointTreeNode:PointTreeNode = { x: node.data.x, y: node.data.y, width: 1, height: 1, point: node }
       pointTree.insert(pointTreeNode)
       // Calulate AABB
@@ -94,13 +104,56 @@ class SimplePath {
       this.aabbMax.y = Math.max(this.aabbMax.x, graphics.y)
       this.aabbMin.x = Math.min(this.aabbMin.x, graphics.x)
       this.aabbMin.y = Math.min(this.aabbMin.x, graphics.y)
-      //
-      const line = new SimpleLine(new PIXI.Point(parent.data.x, parent.data.y), (new PIXI.Point(graphics.x, graphics.y)))
+      // Create segment
+      const line = new SimpleLine(new PIXI.Point(this.tail.data.x, this.tail.data.y), (new PIXI.Point(graphics.x, graphics.y)))
+      this.lines.push(line)
+      this.mapping.set(node, line)
+      this.mapping.set(node.prev, line)
+      // Insert line into quadtree
+      const lineTreeNode:LineTreeNode = { x: line.aabbMin.x, y: line.aabbMin.y, width: (line.aabbMax.x - line.aabbMin.x), height: (line.aabbMax.y - line.aabbMin.y), line: line }
+      lineTree.insert(lineTreeNode)
+      // Calulate signed area
+      this.sum += (graphics.x - this.tail.data.x) * (graphics.y + this.tail.data.y)
+      // Draw Lines
+      this.drawLines()
+      return node
+    }
+
+    /**
+     * Check specified line whether intersecting with another lines (Wrose case : O(n^2))
+     * @param modifiedLines The line has been modified
+     * @todo Use sweep line when the number of input is greather than log(n)
+     */
+    checkLines (modifiedLines:SimpleLine[]) {
+      modifiedLines.forEach((elem) => {
+        elem.intersectedLine.clear()
+        this.lines.forEach((another) => {
+          if (another !== elem) {
+            elem.intersect(another)
+          }
+        })
+      })
+    }
+
+    closePath (lineTree: Quadtree) {
+      this.tail.insert(this.head)
+      this.tail = this.head
+      const line = new SimpleLine(new PIXI.Point(this.tail.data.x, this.tail.data.y), (new PIXI.Point(this.tail.data.x, this.tail.data.y)))
       this.lines.push(line)
       const lineTreeNode:LineTreeNode = { x: line.aabbMin.x, y: line.aabbMin.y, width: (line.aabbMax.x - line.aabbMin.x), height: (line.aabbMax.y - line.aabbMin.y), line: line }
       lineTree.insert(lineTreeNode)
-      //
-      this.sum += (graphics.x - parent.data.x) * (graphics.y + parent.data.y)
+      this.drawLines()
+    }
+
+    insertDataIntoTree (pointTree: Quadtree, lineTree: Quadtree) {
+      this.points.forEach((node) => {
+        const pointTreeNode:PointTreeNode = { x: node.data.x, y: node.data.y, width: 1, height: 1, point: node }
+        pointTree.insert(pointTreeNode)
+      })
+      this.lines.forEach((line) => {
+        const lineTreeNode:LineTreeNode = { x: line.aabbMin.x, y: line.aabbMin.y, width: (line.aabbMax.x - line.aabbMin.x), height: (line.aabbMax.y - line.aabbMin.y), line: line }
+        lineTree.insert(lineTreeNode)
+      })
     }
 
     drawLines () {

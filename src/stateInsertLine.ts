@@ -1,9 +1,9 @@
 
-import Quadtree from '@timohausmann/quadtree-js'
 import * as PIXI from 'pixi.js'
+import { Context } from './context'
 import { State } from './state'
 import { SimplePath, SimpleNode, StateCtrl } from './stateControl'
-import * as UTILITY from './utility'
+import { BeforeDeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
@@ -25,11 +25,10 @@ class InsertLine extends State {
        * constructor of InsertPoint
        * @param {Map} context The properties will be used in every state.
        */
-    constructor (context: Map<string, any>) {
+    constructor (context:Context) {
       super(context)
       this.onMouseOver = function (e) {
-        this.context.set('mouseTarget', e.currentTarget)
-        const ctrl:StateCtrl = this.context.get('controller')!
+        const ctrl:StateCtrl = this.context.controller
         ctrl.change('connectPoint')
       }
       this.onKeyUp = function (e:KeyboardEvent) {
@@ -38,49 +37,37 @@ class InsertLine extends State {
         }
         if (e.key === 'Esc' || e.key === 'Escape') {
           if (this.app === undefined) return
-          const lastPoint:PIXI.Graphics = this.context.get('lastPoint')!
-          if (this.currGraph === null) {
-            this.app.stage.removeChild(lastPoint)
+
+          if (this.currGraph!.count === 1) {
+            BeforeDeletePath(this.context, this.context.currentPath!)
+            delete this.context.currentPath
+            this.context.currentPath = null
           }
-          this.currGraph = null
-          this.context.set('lastPoint', undefined)
-          const ctrl:StateCtrl = this.context.get('controller')!
+
+          const ctrl:StateCtrl = this.context.controller
           ctrl.change('insertPoint')
         }
       }
       this.onClick = function () {
         if (this.app === undefined) return
-        const lastPoint:PIXI.Graphics = this.context.get('lastPoint')!
-        const mapping:Map<PIXI.Graphics, SimpleNode> = this.context.get('mapping')!
-        const owner:Map<SimpleNode, SimplePath> = this.context.get('owner')!
-        const pointTree:Quadtree = this.context.get('pointTree')!
-        const lineTree:Quadtree = this.context.get('lineTree')!
-        // Create a new graph if this is the first line
-        if (this.currGraph === null) {
-          this.currGraph = UTILITY.AddNewGraph(lastPoint, this.app.stage, owner, mapping)
-          this.context.set('currentGraph', this.currGraph)
-          this.context.get('paths').push(this.currGraph)
-          UTILITY.DrawSolidPoint(lastPoint)
-          this.currGraph.head.data.interactive = true
-          this.currGraph.head.data.on('mouseover', this.onMouseOverHandler)
-        }
-        // Move point
+        // Initilize container
+        const mapping:Map<PIXI.Graphics, SimpleNode> = this.context.mapping
+        const owner:Map<SimpleNode, SimplePath> = this.context.owner
+        // Create new entity of engine
         const mousePos = this.app.renderer.plugins.interaction.mouse.global
-        // Add the current posistion into graph
         const newEntity = new PIXI.Graphics()
         newEntity.x = mousePos.x
         newEntity.y = mousePos.y
-        const parent:SimpleNode = mapping.get(lastPoint)!
-        this.currGraph!.addNewPoint(newEntity, owner, mapping, parent, pointTree, lineTree)
-        UTILITY.DrawSolidPoint(newEntity)
         this.app.stage.addChild(newEntity)
-
-        this.context.set('lastPoint', newEntity)
+        // Add the entity to my path
+        const node = this.currGraph!.addNewPoint(newEntity, this.context.pointTree!, this.context.lineTree!)
+        mapping.set(newEntity, node)
+        owner.set(node, this.currGraph!)
       }
       this.onUpdate = function () {
         if (this.app !== undefined) {
           const helpLine = this.helpLine!
-          const lastPoint = this.context.get('lastPoint')
+          const lastPoint = this.context.currentPath!.tail.data
           const mousePos = this.app.renderer.plugins.interaction.mouse.global
           helpLine.clear()
           helpLine.lineStyle(15, 0x000000, 0.8, 1, true)
@@ -116,11 +103,7 @@ class InsertLine extends State {
        * @param {string} prevState Notice the state which state has been switched.
        */
     enter (prevState:string) {
-      this.app = this.context.get('app')!
-      this.paths = this.context.get('paths')!
-      if (prevState === 'InsertPoint') {
-        this.currGraph = null
-      }
+      this.app = this.context.app!
       if (this.app !== undefined) {
         if (this.helpLine === undefined) {
           this.helpLine = new PIXI.Graphics()
@@ -129,6 +112,7 @@ class InsertLine extends State {
           this.helpLine.clear()
         }
         // Add necessary events
+        this.context.currentPath!.head.data.on('mouseover', this.onMouseOverHandler)
         this.app.renderer.view.addEventListener('click', this.onClickHandler)
         this.app.ticker.add(this.onUpdateHandler)
         window.addEventListener('keyup', this.onKeyUpHandler)
@@ -149,6 +133,9 @@ class InsertLine extends State {
         this.app.ticker.remove(this.onUpdateHandler)
         if (this.helpLine !== undefined) {
           this.helpLine.clear()
+        }
+        if (this.context.currentPath !== null) {
+          this.context.currentPath!.head.data.removeListener('mouseover', this.onMouseOverHandler)
         }
         this.app.renderer.view.removeEventListener('click', this.onClickHandler)
         window.removeEventListener('keyup', this.onKeyUpHandler)

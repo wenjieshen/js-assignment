@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js'
-import { SimplePath, SimpleNode } from './stateControl'
+import { Context } from './context'
+import { SimplePath } from './simplePath'
 const DrawHoledPoint = function (graphics:PIXI.Graphics) {
   graphics.clear()
   graphics.lineStyle(1)
@@ -16,20 +17,21 @@ const DrawSolidPoint = function (graphics:PIXI.Graphics) {
   graphics.endFill()
   // graphics.cacheAsBitmap = true
 }
-const AddNewGraph = function (graphics:PIXI.Graphics, container:PIXI.Container, owner:Map<SimpleNode, SimplePath>, mapping:Map<PIXI.Graphics, SimpleNode>) {
-  const head = new SimpleNode(graphics)
-  mapping.set(graphics, head)
-  const graph = new SimplePath(head, container.addChild(new PIXI.Graphics()))
-  owner.set(head, graph)
-  graph.aabbMax.x = head.data.x
-  graph.aabbMin.x = head.data.x
-  graph.aabbMax.y = head.data.y
-  graph.aabbMin.y = head.data.y
-  return graph
+const BeforeDeletePath = function (context:Context, path:SimplePath) {
+  context.app!.stage.removeChild(path.paint)
+  path.points.forEach((point) => {
+    context.app!.stage.removeChild(point.data)
+    context.mapping.delete(point.data)
+    context.owner.delete(point)
+  })
+  context.pointTree!.clear()
+  context.lineTree!.clear()
+  context.path.forEach((elem) => {
+    elem.insertDataIntoTree(context.pointTree!, context.lineTree!)
+  })
 }
-
 export {
   DrawHoledPoint,
   DrawSolidPoint,
-  AddNewGraph
+  BeforeDeletePath
 }
