@@ -53,7 +53,7 @@ class ConnectPoint extends State {
       this.onUpdate = function () {
         if (this.app !== undefined) {
           const helpLine = this.helpLine!
-          const lastPoint:PIXI.Graphics = this.context.currentPath!.tail.data
+          const lastPoint = this.context.currentPath!.tail.data
           const mousePos = this.app.renderer.plugins.interaction.mouse.global
           helpLine.clear()
           helpLine.lineStyle(15, 0x000000, 0.8, 1, true)

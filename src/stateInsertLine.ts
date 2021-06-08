@@ -11,26 +11,29 @@ class InsertLine extends State {
     name = 'InsertLine'
     app?: PIXI.Application;
     helpLine? : PIXI.Graphics;
-    currGraph : SimplePath|null = null;
-    paths?: SimplePath[];
     onClick: () => void;
     onClickHandler: () => void;
     onUpdate: () => void;
     onUpdateHandler: () => void;
     onKeyUp: (e: KeyboardEvent) => void;
     onKeyUpHandler: (e: KeyboardEvent) => void;
-    onMouseOver: (e:PIXI.interaction.InteractionEvent) => void;
-    onMouseOverHandler: (e:PIXI.interaction.InteractionEvent) => void;
+    onMouseOverOtherPath: (e:PIXI.interaction.InteractionEvent) => void;
+    onMouseOverOtherPathHandler: (e:PIXI.interaction.InteractionEvent) => void;
+    onMouseOverHead: () => void
+    onMouseOverHeadHandler: () => void
     /**
        * constructor of InsertPoint
        * @param {Map} context The properties will be used in every state.
        */
     constructor (context:Context) {
       super(context)
-      this.onMouseOver = function (e) {
-        const ctrl:StateCtrl = this.context.controller
-        ctrl.change('connectPoint')
+      this.onMouseOverOtherPath = function (e) {
+        console.log(e)
       }
+      this.onMouseOverHead = function () {
+        this.context.controller.change('connectPoint')
+      }
+      this.onMouseOverHeadHandler = this.onMouseOverHead.bind(this)
       this.onKeyUp = function (e:KeyboardEvent) {
         if (e.defaultPrevented) {
           return
@@ -38,7 +41,7 @@ class InsertLine extends State {
         if (e.key === 'Esc' || e.key === 'Escape') {
           if (this.app === undefined) return
 
-          if (this.currGraph!.count === 1) {
+          if (this.context.currentPath!.count === 1) {
             BeforeDeletePath(this.context, this.context.currentPath!)
             delete this.context.currentPath
             this.context.currentPath = null
@@ -60,9 +63,13 @@ class InsertLine extends State {
         newEntity.y = mousePos.y
         this.app.stage.addChild(newEntity)
         // Add the entity to my path
-        const node = this.currGraph!.addNewPoint(newEntity, this.context.pointTree!, this.context.lineTree!)
+        const node = this.context.currentPath!.addNewPoint(newEntity, this.context.pointTree!, this.context.lineTree!)
         mapping.set(newEntity, node)
-        owner.set(node, this.currGraph!)
+        owner.set(node, this.context.currentPath!)
+        //
+        // Add necessary events
+        this.context.currentPath!.head.data.on('mouseover', this.onMouseOverHeadHandler)
+        this.context.currentPath!.head.data.interactive = true
       }
       this.onUpdate = function () {
         if (this.app !== undefined) {
@@ -78,7 +85,7 @@ class InsertLine extends State {
       this.onKeyUpHandler = this.onKeyUp.bind(this)
       this.onClickHandler = this.onClick.bind(this)
       this.onUpdateHandler = this.onUpdate.bind(this)
-      this.onMouseOverHandler = this.onMouseOver.bind(this)
+      this.onMouseOverOtherPathHandler = this.onMouseOverOtherPath.bind(this)
     }
 
     /**
@@ -111,15 +118,14 @@ class InsertLine extends State {
         } else {
           this.helpLine.clear()
         }
-        // Add necessary events
-        this.context.currentPath!.head.data.on('mouseover', this.onMouseOverHandler)
         this.app.renderer.view.addEventListener('click', this.onClickHandler)
         this.app.ticker.add(this.onUpdateHandler)
         window.addEventListener('keyup', this.onKeyUpHandler)
-        this.paths!.forEach((graph) => {
-          graph.points.forEach((node) => {
-            node.data.on('mouseover', this.onMouseOverHandler)
-          })
+        this.context.path.forEach((path) => {
+          if (path.head !== path.tail) {
+            path.head.data.on('mouseover', this.onMouseOverOtherPathHandler)
+            path.tail.data.on('mouseover', this.onMouseOverOtherPathHandler)
+          }
         })
       }
     }
@@ -135,14 +141,21 @@ class InsertLine extends State {
           this.helpLine.clear()
         }
         if (this.context.currentPath !== null) {
-          this.context.currentPath!.head.data.removeListener('mouseover', this.onMouseOverHandler)
+          this.context.currentPath!.head.data.removeListener('mouseover', this.onMouseOverHeadHandler)
+          this.context.currentPath!.head.data.interactive = false
         }
         this.app.renderer.view.removeEventListener('click', this.onClickHandler)
         window.removeEventListener('keyup', this.onKeyUpHandler)
-        this.paths?.forEach((graph) => {
-          graph.points.forEach((node) => {
-            node.data.removeListener('mouseover', this.onMouseOverHandler)
-          })
+        this.context.path.forEach((path) => {
+          path.points.forEach((node) => {
+            if (path.head !== path.tail) {
+              path.head.data.removeListener('mouseover', this.onMouseOverOtherPathHandler)
+              path.tail.data.removeListener('mouseover', this.onMouseOverOtherPathHandler)
+              path.tail.data.interactive = false
+              path.head.data.interactive = false
+            }
+          }
+          )
         })
       }
     }
