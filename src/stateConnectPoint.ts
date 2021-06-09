@@ -46,7 +46,7 @@ class ConnectPoint extends State {
       this.onClick = function () {
         if (this.app === undefined) return
         const currGraph:SimplePath = this.context.currentPath!
-        currGraph!.closePath(this.context.lineTree!)
+        currGraph!.closePath()
         const ctrl:StateCtrl = this.context.controller
         ctrl.change('insertPoint')
       }
@@ -116,7 +116,7 @@ class ConnectPoint extends State {
           this.helpCircle.clear()
         }
         // Helper
-        this.mouseTarget = this.context.currentPath!.head.data
+        this.mouseTarget = this.context.connection.get(this.context.currentPath!.head)!
         this.mouseTarget!.tint = 0xC0392B
         // Helper
         this.helpCircle.lineStyle(3, 0x2E86C1)

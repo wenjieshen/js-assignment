@@ -20,10 +20,10 @@ class StateCtrl {
         app: null,
         currentPath: null,
         controller: this,
+        connection: new Map<SimpleNode, PIXI.Graphics>(),
         mapping: new Map<PIXI.Graphics, SimpleNode>(),
         owner: new Map<SimpleNode, SimplePath>(),
         pointTree: null,
-        lineTree: null,
         path: []
       }
       // Create all state in advance.
@@ -41,7 +41,6 @@ class StateCtrl {
     injectApp (app:PIXI.Application) {
       this.context.app = app
       this.context.pointTree = new Quadtree({ x: 0, y: 0, width: app.renderer.width, height: app.renderer.height })
-      this.context.lineTree = new Quadtree({ x: 0, y: 0, width: app.renderer.width, height: app.renderer.height })
       // Default state is Insert Point
       this.currState = this.states.get('insertPoint')!
       this.currState.enter('none')

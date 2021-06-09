@@ -54,6 +54,7 @@ class InsertLine extends State {
       this.onClick = function () {
         if (this.app === undefined) return
         // Initilize container
+        const connection:Map<SimpleNode, PIXI.Graphics> = this.context.connection
         const mapping:Map<PIXI.Graphics, SimpleNode> = this.context.mapping
         const owner:Map<SimpleNode, SimplePath> = this.context.owner
         // Create new entity of engine
@@ -63,13 +64,18 @@ class InsertLine extends State {
         newEntity.y = mousePos.y
         this.app.stage.addChild(newEntity)
         // Add the entity to my path
-        const node = this.context.currentPath!.addNewPoint(newEntity, this.context.pointTree!, this.context.lineTree!)
+        const node = this.context.currentPath!.addNewPoint(new PIXI.Point(newEntity.x, newEntity.y), this.context.pointTree!)
+        connection.set(node, newEntity)
         mapping.set(newEntity, node)
         owner.set(node, this.context.currentPath!)
         //
         // Add necessary events
-        this.context.currentPath!.head.data.on('mouseover', this.onMouseOverHeadHandler)
-        this.context.currentPath!.head.data.interactive = true
+        const currentPath = this.context.currentPath!
+        if (currentPath.nodes.length > 2) {
+          const headEntity = connection.get(currentPath.head)!
+          headEntity.on('mouseover', this.onMouseOverHeadHandler)
+          headEntity.interactive = true
+        }
       }
       this.onUpdate = function () {
         if (this.app !== undefined) {
@@ -121,12 +127,6 @@ class InsertLine extends State {
         this.app.renderer.view.addEventListener('click', this.onClickHandler)
         this.app.ticker.add(this.onUpdateHandler)
         window.addEventListener('keyup', this.onKeyUpHandler)
-        this.context.path.forEach((path) => {
-          if (path.head !== path.tail) {
-            path.head.data.on('mouseover', this.onMouseOverOtherPathHandler)
-            path.tail.data.on('mouseover', this.onMouseOverOtherPathHandler)
-          }
-        })
       }
     }
 
@@ -141,22 +141,12 @@ class InsertLine extends State {
           this.helpLine.clear()
         }
         if (this.context.currentPath !== null) {
-          this.context.currentPath!.head.data.removeListener('mouseover', this.onMouseOverHeadHandler)
-          this.context.currentPath!.head.data.interactive = false
+          const headEntity = this.context.connection.get(this.context.currentPath!.head)!
+          headEntity.removeListener('mouseover', this.onMouseOverHeadHandler)
+          headEntity.interactive = false
         }
         this.app.renderer.view.removeEventListener('click', this.onClickHandler)
         window.removeEventListener('keyup', this.onKeyUpHandler)
-        this.context.path.forEach((path) => {
-          path.points.forEach((node) => {
-            if (path.head !== path.tail) {
-              path.head.data.removeListener('mouseover', this.onMouseOverOtherPathHandler)
-              path.tail.data.removeListener('mouseover', this.onMouseOverOtherPathHandler)
-              path.tail.data.interactive = false
-              path.head.data.interactive = false
-            }
-          }
-          )
-        })
       }
     }
 }

@@ -3,12 +3,14 @@ import Quadtree, { Rect } from '@timohausmann/quadtree-js'
 
 class SimpleNode {
     idx:number
-    data:PIXI.Graphics;
+    data:PIXI.Point;
     next:SimpleNode
     prev:SimpleNode
     nextVertex:SimpleNode
     prevVertex:SimpleNode
-    constructor (data:PIXI.Graphics, idx:number) {
+    isVertex:boolean = false
+    isEntry:boolean = false
+    constructor (data:PIXI.Point, idx:number) {
       this.data = data
       this.next = this
       this.prev = this
@@ -40,7 +42,6 @@ class SimpleLine {
   p1: SimpleNode;
   aabbMax: PIXI.Point = new PIXI.Point();
   aabbMin: PIXI.Point = new PIXI.Point();
-  intersection = new Map<SimpleLine, SimpleNode>()
   constructor (p0: SimpleNode, p1: SimpleNode) {
     this.p0 = p0
     this.p1 = p1
@@ -74,26 +75,25 @@ class SimpleLine {
     return false// No collision
   }
 }
-interface LineTreeNode extends Rect {
-  line:SimpleLine
-}
+
 class SimplePath {
     head:SimpleNode;
     tail:SimpleNode;
     count = 0
-    points:SimpleNode[];
+    nodes:SimpleNode[];
     paint:PIXI.Graphics;
     lines:SimpleLine[];
     aabbMax: PIXI.Point = new PIXI.Point();
     aabbMin:PIXI.Point = new PIXI.Point();
     sum:number = 0;
     intersectedVertices:SimpleNode[] = []
+    vertexPair:Map<SimpleNode, SimpleNode> = new Map<SimpleNode, SimpleNode>()
     constructor (head:SimpleNode, paint:PIXI.Graphics) {
       this.head = head
       this.tail = head
-      this.points = []
+      this.nodes = []
       this.lines = []
-      this.points.push(head)
+      this.nodes.push(head)
       this.paint = paint
       this.count = 1
       this.aabbMax.x = head.data.x
@@ -102,8 +102,8 @@ class SimplePath {
       this.aabbMin.y = head.data.y
     }
 
-    addNewPoint (graphics:PIXI.Graphics, pointTree: Quadtree, lineTree: Quadtree) {
-      const node = new SimpleNode(graphics, this.count)
+    addNewPoint (coord:PIXI.Point, pointTree: Quadtree) {
+      const node = new SimpleNode(coord, this.count)
       // Insert into my data structure
       this.tail.insert(node)
       this.tail = this.tail.next
@@ -111,19 +111,15 @@ class SimplePath {
       const pointTreeNode:PointTreeNode = { x: node.data.x, y: node.data.y, width: 1, height: 1, point: node }
       pointTree.insert(pointTreeNode)
       // Calulate AABB
-      this.aabbMax.x = Math.max(this.aabbMax.x, graphics.x)
-      this.aabbMax.y = Math.max(this.aabbMax.x, graphics.y)
-      this.aabbMin.x = Math.min(this.aabbMin.x, graphics.x)
-      this.aabbMin.y = Math.min(this.aabbMin.x, graphics.y)
+      this.aabbMax.x = Math.max(this.aabbMax.x, coord.x)
+      this.aabbMax.y = Math.max(this.aabbMax.x, coord.y)
+      this.aabbMin.x = Math.min(this.aabbMin.x, coord.x)
+      this.aabbMin.y = Math.min(this.aabbMin.x, coord.y)
       // Create segment
       const line = new SimpleLine(node.prev, node)
-      this.lines.push(line)
-      this.checkLines([line])
-      // Insert line into quadtree
-      const lineTreeNode:LineTreeNode = { x: line.aabbMin.x, y: line.aabbMin.y, width: (line.aabbMax.x - line.aabbMin.x), height: (line.aabbMax.y - line.aabbMin.y), line: line }
-      lineTree.insert(lineTreeNode)
+      this.addLines([line])
       // Calulate signed area
-      this.sum += (graphics.x - this.tail.data.x) * (graphics.y + this.tail.data.y)
+      this.sum += (coord.x - this.tail.data.x) * (coord.y + this.tail.data.y)
       // Draw Lines
       this.drawLines()
       //
@@ -132,97 +128,106 @@ class SimplePath {
     }
 
     /**
-     * Check specified line whether intersecting with another lines (Wrose case : O(n^2))
+     * Add specified line whether intersecting with another lines (Wrose case : O(n^2))
      * @param modifiedLines The line has been modified
      * @todo Use sweep line when the number of input is greather than log(n)
      */
-    checkLines (modifiedLines:SimpleLine[]) {
+    addLines (modifiedLines:SimpleLine[]) {
       const point = new PIXI.Point()
+      const makeLines = function (p0: SimpleNode, p1: SimpleNode, v: SimpleNode, arr: SimpleLine[]) {
+        p0.insertVertex(v)
+        arr.push(new SimpleLine(p0, v))
+        arr.push(new SimpleLine(v, p1))
+      }
       modifiedLines.forEach((elem) => {
+        const existLines:Set<SimpleLine> = new Set<SimpleLine>(this.lines)
+        const currLines:SimpleLine[] = []
+        let intersecting = false
         this.lines.forEach((another) => {
-          if (another !== elem && elem.p0 !== another.p1 && elem.p1 !== another.p0) {
-            if (elem.intersect(another, point)) {
-              const data0 = new PIXI.Graphics()
-              const data1 = new PIXI.Graphics()
-              data0.x = point.x
-              data0.y = point.y
-              data1.x = point.x
-              data1.y = point.y
-              const vertex0 = new SimpleNode(data0, -1)
-              const vertex1 = new SimpleNode(data1, -1)
-              //
-              elem.p0.insert(vertex0)
-              vertex0.nextVertex = another.p1
-              vertex0.nextVertex.prevVertex = vertex0
-              another.p0.insert(vertex1)
-              vertex1.nextVertex = elem.p1
-              vertex1.nextVertex.prevVertex = vertex1
-              //
-              vertex0.idx = -this.intersectedVertices.push(vertex0)
-              vertex1.idx = -this.intersectedVertices.push(vertex1)
-            } else if (elem.intersection.has(another)) { // No longer to intersecting
-              const v0 = elem.intersection.get(another)!
-              v0.prevVertex = v0.prevVertex.prevVertex
-              v0.nextVertex = v0.nextVertex.nextVertex
-              this.intersectedVertices.splice(-v0.idx)
-              // I want to delete the vertex but Lint warns me don't do it
-              const v1 = another.intersection.get(elem)!
-              v1.prevVertex = v1.prevVertex.prevVertex
-              v1.nextVertex = v1.nextVertex.nextVertex
-              this.intersectedVertices.splice(-v1.idx)
-            }
+          if (another === elem || elem.p0 === another.p1 || elem.p1 === another.p0) {
+            return
           }
+          if (!elem.intersect(another, point)) {
+            return
+          }
+          intersecting = true
+          existLines.delete(another)
+          const data0 = new PIXI.Point()
+          const data1 = new PIXI.Point()
+          data0.x = point.x
+          data0.y = point.y
+          data1.x = point.x
+          data1.y = point.y
+          const vertex0 = new SimpleNode(data0, -1)
+          vertex0.isVertex = true // Debugging
+          const vertex1 = new SimpleNode(data1, -1)
+          vertex1.isVertex = true // Debugging
+          this.vertexPair.set(vertex0, vertex1)
+          this.vertexPair.set(vertex1, vertex0)
+          // Vertices
+          makeLines(elem.p0, elem.p1, vertex0, currLines)
+          makeLines(another.p0, another.p1, vertex1, currLines)
+          //
+          vertex0.idx = this.intersectedVertices.push(vertex0)
+          vertex1.idx = this.intersectedVertices.push(vertex1)
         })
+        if (!intersecting) {
+          currLines.push(elem)
+        }
+        this.lines = Array.from(existLines)
+        currLines.forEach(obj => this.lines.push(obj))
       })
     }
 
-    closePath (lineTree: Quadtree) {
+    closePath () {
       const line = new SimpleLine(this.tail, this.tail.next)
-      this.lines.push(line)
-      const lineTreeNode:LineTreeNode = { x: line.aabbMin.x, y: line.aabbMin.y, width: (line.aabbMax.x - line.aabbMin.x), height: (line.aabbMax.y - line.aabbMin.y), line: line }
-      lineTree.insert(lineTreeNode)
-      this.checkLines([line])
+      this.addLines([line])
       this.drawFill()
     }
 
-    insertDataIntoTree (pointTree: Quadtree, lineTree: Quadtree) {
-      this.points.forEach((node) => {
+    insertDataIntoTree (pointTree: Quadtree) {
+      this.nodes.forEach((node) => {
         const pointTreeNode:PointTreeNode = { x: node.data.x, y: node.data.y, width: 1, height: 1, point: node }
         pointTree.insert(pointTreeNode)
-      })
-      this.lines.forEach((line) => {
-        const lineTreeNode:LineTreeNode = { x: line.aabbMin.x, y: line.aabbMin.y, width: (line.aabbMax.x - line.aabbMin.x), height: (line.aabbMax.y - line.aabbMin.y), line: line }
-        lineTree.insert(lineTreeNode)
       })
     }
 
     drawFill () {
       this.paint.clear()
-      /* Debugging
+      // Debugging
       this.intersectedVertices.forEach((vertex) => {
         this.paint.beginFill(0xFEEB77, 0.2)
         this.paint.drawRect(vertex.data.x, vertex.data.y, 10, 10)
         this.paint.endFill()
-      }) */
-
-      let polygons = [this.head]
+      })
+      const drawPath = []
       if (this.intersectedVertices.length !== 0) {
-        polygons = this.intersectedVertices
-      }
-      polygons.forEach((vertex) => {
-        const stop = vertex
-        let head = vertex
-        const drawPath = []
+        this.intersectedVertices.forEach((vertex) => {
+          const stop = vertex
+          let head = vertex
+
+          do {
+            do {
+              drawPath.push(head.data.x)
+              drawPath.push(head.data.y)
+              head = head.nextVertex
+            } while (!head.isVertex)
+            head = this.vertexPair.get(head)!
+          } while (head !== stop)
+        })
+      } else {
+        const stop = this.head
+        let head = this.head
         do {
           drawPath.push(head.data.x)
           drawPath.push(head.data.y)
-          head = head.nextVertex
-        } while (head !== stop)
-        this.paint.beginFill(0xFEEB77, 0.8)
-        this.paint.drawPolygon(drawPath)
-        this.paint.closePath()
-        this.paint.endFill()
-      })
+          head = head.next
+        } while (stop === head)
+      }
+      this.paint.beginFill(0xFEEB77, 0.8)
+      this.paint.drawPolygon(drawPath)
+      this.paint.closePath()
+      this.paint.endFill()
     }
 
     drawLines () {

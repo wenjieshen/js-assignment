@@ -19,15 +19,16 @@ const DrawSolidPoint = function (graphics:PIXI.Graphics) {
 }
 const BeforeDeletePath = function (context:Context, path:SimplePath) {
   context.app!.stage.removeChild(path.paint)
-  path.points.forEach((point) => {
-    context.app!.stage.removeChild(point.data)
-    context.mapping.delete(point.data)
-    context.owner.delete(point)
+  path.nodes.forEach((node) => {
+    const headEntity = context.connection.get(node)!
+    context.app!.stage.removeChild(headEntity)
+    context.connection.delete(node)
+    context.mapping.delete(headEntity)
+    context.owner.delete(node)
   })
   context.pointTree!.clear()
-  context.lineTree!.clear()
   context.path.forEach((elem) => {
-    elem.insertDataIntoTree(context.pointTree!, context.lineTree!)
+    elem.insertDataIntoTree(context.pointTree!)
   })
 }
 export {
