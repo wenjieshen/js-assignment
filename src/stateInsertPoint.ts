@@ -33,7 +33,8 @@ class InsertPoint extends State {
         pointEntity.y = mousePos.y
         console.log(pointEntity.x, pointEntity.y)
         // Create a current path
-        const head = new SimpleNode(pointEntity, 0)
+        const head = new SimpleNode(new PIXI.Point(pointEntity.x, pointEntity.y), 0)
+        this.context.connection.set(head, pointEntity)
         this.context.mapping.set(pointEntity, head)
         this.context.currentPath = new SimplePath(head, this.app.stage.addChild(new PIXI.Graphics()))
         this.context.owner.set(head, this.context.currentPath)
