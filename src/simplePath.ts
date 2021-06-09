@@ -187,65 +187,70 @@ class SimplePath {
       })
     }
 
+    setStatus () {
+      const stop = this.head
+      let curr = stop
+      let isEntry = false
+      do {
+        if (curr.isVertex) {
+          curr.isEntry = !isEntry
+          isEntry = !isEntry
+        }
+        curr = curr.nextVertex
+      } while (stop !== curr)
+    }
+
+    drawUnion () {
+      this.setStatus()
+      const seen = new Set<SimpleNode>()
+      this.intersectedVertices.forEach((vertex) => {
+        if (seen.has(vertex)) {
+          return
+        }
+        const drawPath = []
+        const stop = vertex
+        let head = vertex
+        seen.add(head)
+        this.paint.moveTo(head.data.x, head.data.y)
+        this.paint.lineStyle(5, 0x77EB77)
+        do {
+          if (head.isEntry) {
+            do {
+              seen.add(head)
+              drawPath.push(head.data.x)
+              drawPath.push(head.data.y)
+              // this.paint.lineTo(head.prevVertex.data.x, head.prevVertex.data.y)
+              head = head.prevVertex
+            } while (!head.isVertex)
+          } else {
+            do {
+              seen.add(head)
+              drawPath.push(head.data.x)
+              drawPath.push(head.data.y)
+              // this.paint.lineTo(head.nextVertex.data.x, head.nextVertex.data.y)
+              head = head.nextVertex
+            } while (!head.isVertex)
+          }
+          head = this.vertexPair.get(head)!
+        } while (head !== stop)
+        this.paint.beginFill(0xFEEB77, 0.1)
+        this.paint.drawPolygon(drawPath)
+        this.paint.closePath()
+        this.paint.endFill()
+      })
+    }
+
     drawFill () {
       this.paint.clear()
       // Debugging
-      this.intersectedVertices.forEach((vertex) => {
+      /* this.intersectedVertices.forEach((vertex) => {
         this.paint.beginFill(0xFEEB77, 0.2)
         this.paint.drawRect(vertex.data.x, vertex.data.y, 10, 10)
         this.paint.endFill()
-      })
-      const setStatus = function (head:SimpleNode) {
-        const stop = head
-        let curr = stop
-        let isEntry = false
-        do {
-          if (curr.isVertex) {
-            curr.isEntry = !isEntry
-            isEntry = !isEntry
-          }
-          curr = curr.nextVertex
-        } while (stop !== curr)
-      }
+      }) */
+
       if (this.intersectedVertices.length !== 0) {
-        setStatus(this.head)
-        const seen = new Set<SimpleNode>()
-        this.intersectedVertices.forEach((vertex) => {
-          if (seen.has(vertex)) {
-            return
-          }
-          const drawPath = []
-          const stop = vertex
-          let head = vertex
-          seen.add(head)
-          this.paint.moveTo(head.data.x, head.data.y)
-          this.paint.lineStyle(2, 0xFEEB77, 1)
-          do {
-            if (head.isEntry) {
-              do {
-                seen.add(head)
-                drawPath.push(head.data.x)
-                drawPath.push(head.data.y)
-                this.paint.lineTo(head.prevVertex.data.x, head.prevVertex.data.y)
-                head = head.prevVertex
-              } while (!head.isVertex)
-            } else {
-              do {
-                seen.add(head)
-                drawPath.push(head.data.x)
-                drawPath.push(head.data.y)
-                this.paint.lineTo(head.nextVertex.data.x, head.nextVertex.data.y)
-                head = head.nextVertex
-              } while (!head.isVertex)
-            }
-            head = this.vertexPair.get(head)!
-          } while (head !== stop)
-          this.paint.lineStyle(2, 0xFEEB77, 1)
-          this.paint.beginFill(0xFEEB77, 0.1)
-          this.paint.drawPolygon(drawPath)
-          this.paint.closePath()
-          this.paint.endFill()
-        })
+        this.drawUnion()
       } else {
         const drawPath = []
         const stop = this.head
@@ -255,7 +260,7 @@ class SimplePath {
           drawPath.push(head.data.y)
           head = head.next
         } while (head !== stop)
-        this.paint.lineStyle(2, 0xFEEB77, 1)
+        this.paint.lineStyle(5, 0x77EB77)
         this.paint.beginFill(0xFEEB77, 0.8)
         this.paint.drawPolygon(drawPath)
         this.paint.closePath()
