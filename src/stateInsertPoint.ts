@@ -2,7 +2,6 @@ import * as PIXI from 'pixi.js'
 import { Context } from './context'
 import { State } from './state'
 import { SimpleNode, SimplePath } from './stateControl'
-import * as UTILITY from './utility'
 
 /**
    * The class describes the state of editor when a point should be inserted
@@ -27,11 +26,10 @@ class InsertPoint extends State {
         // Create a root entity
         const pointEntity = new PIXI.Graphics()
         // Draw a basic point
-        UTILITY.DrawHoledPoint(pointEntity)
         this.app.stage.addChild(pointEntity)
         pointEntity.x = mousePos.x
         pointEntity.y = mousePos.y
-        console.log(pointEntity.x, pointEntity.y)
+        pointEntity.hitArea = new PIXI.Rectangle(0, 0, 30, 30)
         // Create a current path
         const head = new SimpleNode(new PIXI.Point(pointEntity.x, pointEntity.y), 0)
         this.context.connection.set(head, pointEntity)

@@ -156,7 +156,8 @@ class SimplePath {
           const vertex0 = new SimpleNode(new PIXI.Point(point.x, point.y), -1)
           vertex0.isVertex = true
           const vertex1 = new SimpleNode(new PIXI.Point(point.x, point.y), -1)
-          vertex1.isVertex = true // Debugging
+          vertex1.isVertex = true
+          // Make pair
           this.vertexPair.set(vertex0, vertex1)
           this.vertexPair.set(vertex1, vertex0)
           // Vertices
@@ -200,72 +201,70 @@ class SimplePath {
       } while (stop !== curr)
     }
 
-    drawUnion () {
+    VisitIntersection (startPathCB:()=>void, coordCB:(x:number, y:number)=>void, closePathCB:()=>void, forward:boolean) {
       this.setStatus()
       const seen = new Set<SimpleNode>()
       this.intersectedVertices.forEach((vertex) => {
-        if (seen.has(vertex)) {
-          return
-        }
-        const drawPath = []
+        if (seen.has(vertex)) return
         const stop = vertex
         let head = vertex
-        seen.add(head)
-        this.paint.moveTo(head.data.x, head.data.y)
-        this.paint.lineStyle(5, 0x77EB77)
+        startPathCB()
         do {
-          if (head.isEntry) {
+          if (head.isEntry === forward) {
             do {
               seen.add(head)
-              drawPath.push(head.data.x)
-              drawPath.push(head.data.y)
-              // this.paint.lineTo(head.prevVertex.data.x, head.prevVertex.data.y)
+              coordCB(head.data.x, head.data.y)
               head = head.prevVertex
             } while (!head.isVertex)
           } else {
             do {
               seen.add(head)
-              drawPath.push(head.data.x)
-              drawPath.push(head.data.y)
-              // this.paint.lineTo(head.nextVertex.data.x, head.nextVertex.data.y)
+              coordCB(head.data.x, head.data.y)
               head = head.nextVertex
             } while (!head.isVertex)
           }
           head = this.vertexPair.get(head)!
         } while (head !== stop)
-        this.paint.beginFill(0xFEEB77, 0.1)
-        this.paint.drawPolygon(drawPath)
-        this.paint.closePath()
-        this.paint.endFill()
+        closePathCB()
       })
     }
 
-    drawFill () {
-      this.paint.clear()
-      // Debugging
-      /* this.intersectedVertices.forEach((vertex) => {
-        this.paint.beginFill(0xFEEB77, 0.2)
-        this.paint.drawRect(vertex.data.x, vertex.data.y, 10, 10)
-        this.paint.endFill()
-      }) */
+    drawXOR () {
+      this.paint.lineStyle(5, 0x77EB77)
+      this.paint.beginFill(0xFEEB77, 0.3)
+      let polygon:number[] = []
+      this.VisitIntersection(() => { polygon = [] }, (x, y) => { polygon.push(x, y) }, () => { this.paint.drawPolygon(polygon); this.paint.closePath() }, true)
+      this.paint.endFill()
+      this.paint.beginFill(0xEB77FE, 0.3)
+      this.VisitIntersection(() => { polygon = [] }, (x, y) => { polygon.push(x, y) }, () => { this.paint.drawPolygon(polygon); this.paint.closePath() }, false)
+      this.paint.endFill()
+    }
 
+    drawNonIntersection () {
+      const drawPath = []
+      const stop = this.head
+      let head = this.head
+      do {
+        drawPath.push(head.data.x)
+        drawPath.push(head.data.y)
+        head = head.next
+      } while (head !== stop)
+      this.paint.lineStyle(5, 0x77EB77)
+      this.paint.beginFill(0xFEEB77, 0.8)
+      this.paint.drawPolygon(drawPath)
+      this.paint.closePath()
+      this.paint.endFill()
+    }
+
+    drawFill () {
+      this.paint.cacheAsBitmap = false
+      this.paint.clear()
       if (this.intersectedVertices.length !== 0) {
-        this.drawUnion()
+        this.drawXOR()
       } else {
-        const drawPath = []
-        const stop = this.head
-        let head = this.head
-        do {
-          drawPath.push(head.data.x)
-          drawPath.push(head.data.y)
-          head = head.next
-        } while (head !== stop)
-        this.paint.lineStyle(5, 0x77EB77)
-        this.paint.beginFill(0xFEEB77, 0.8)
-        this.paint.drawPolygon(drawPath)
-        this.paint.closePath()
-        this.paint.endFill()
+        this.drawNonIntersection()
       }
+      this.paint.cacheAsBitmap = true
     }
 
     drawLines () {
@@ -274,11 +273,6 @@ class SimplePath {
       this.lines.forEach((line) => {
         this.paint.moveTo(line.p0.data.x, line.p0.data.y)
         this.paint.lineTo(line.p1.data.x, line.p1.data.y)
-      /* AABB for Debug
-        this.paint.beginFill(0xFEEB77, 0.2)
-        this.paint.drawRect(line.aabbMin.x, line.aabbMin.y, line.aabbMax.x - line.aabbMin.x, line.aabbMax.y - line.aabbMin.y)
-        this.paint.endFill()
-        */
       })
     }
 }
