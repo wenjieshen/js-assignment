@@ -75,7 +75,17 @@ class SimpleLine {
     return false// No collision
   }
 }
-
+export interface PathViewSetting{
+  pointSize: number
+  pointColor: number
+  pointAlpha: number
+  lineWidth: number
+  lineColor: number
+  lineAlpha: number
+  fillColor: number
+  backColor: number
+  fillAlpha: number
+}
 class SimplePath {
     head:SimpleNode;
     tail:SimpleNode;
@@ -88,7 +98,8 @@ class SimplePath {
     sum:number = 0;
     intersectedVertices:SimpleNode[] = []
     vertexPair:Map<SimpleNode, SimpleNode> = new Map<SimpleNode, SimpleNode>()
-    constructor (head:SimpleNode, paint:PIXI.Graphics) {
+    viewSetting:PathViewSetting
+    constructor (head:SimpleNode, paint:PIXI.Graphics, viewSetting:PathViewSetting) {
       this.head = head
       this.tail = head
       this.nodes = []
@@ -100,6 +111,8 @@ class SimplePath {
       this.aabbMax.y = head.data.y
       this.aabbMin.x = head.data.x
       this.aabbMin.y = head.data.y
+      this.viewSetting = viewSetting
+      this.drawLines()
     }
 
     addNewPoint (coord:PIXI.Point, pointTree: Quadtree) {
@@ -112,10 +125,8 @@ class SimplePath {
       const pointTreeNode:PointTreeNode = { x: node.data.x, y: node.data.y, width: 1, height: 1, point: node }
       pointTree.insert(pointTreeNode)
       // Calulate AABB
-      this.aabbMax.x = Math.max(this.aabbMax.x, coord.x)
-      this.aabbMax.y = Math.max(this.aabbMax.x, coord.y)
-      this.aabbMin.x = Math.min(this.aabbMin.x, coord.x)
-      this.aabbMin.y = Math.min(this.aabbMin.x, coord.y)
+      this.aabbMax.x = Math.max(this.aabbMax.x, coord.x); this.aabbMax.y = Math.max(this.aabbMax.x, coord.y)
+      this.aabbMin.x = Math.min(this.aabbMin.x, coord.x); this.aabbMin.y = Math.min(this.aabbMin.x, coord.y)
       // Create segment
       const line = new SimpleLine(node.prev, node)
       this.addLines([line])
@@ -135,24 +146,22 @@ class SimplePath {
      */
     addLines (modifiedLines:SimpleLine[]) {
       const point = new PIXI.Point()
+      /** @todo Is it a inline function? */
       const makeLines = function (p0: SimpleNode, p1: SimpleNode, v: SimpleNode, arr: SimpleLine[]) {
         p0.insertVertex(v)
         arr.push(new SimpleLine(p0, v))
         arr.push(new SimpleLine(v, p1))
       }
       modifiedLines.forEach((elem) => {
-        const existLines:Set<SimpleLine> = new Set<SimpleLine>(this.lines)
+        const remainedLines:Set<SimpleLine> = new Set<SimpleLine>(this.lines)
         const currLines:SimpleLine[] = []
         let intersecting = false
         this.lines.forEach((another) => {
-          if (another === elem || elem.p0 === another.p1 || elem.p1 === another.p0) {
-            return
-          }
-          if (!elem.intersect(another, point)) {
-            return
-          }
+          if (another === elem || elem.p0 === another.p1 || elem.p1 === another.p0) return
+          if (!elem.intersect(another, point)) return
+          // Insert interasection vertex
           intersecting = true
-          existLines.delete(another)
+          remainedLines.delete(another)
           const vertex0 = new SimpleNode(new PIXI.Point(point.x, point.y), -1)
           vertex0.isVertex = true
           const vertex1 = new SimpleNode(new PIXI.Point(point.x, point.y), -1)
@@ -165,12 +174,12 @@ class SimplePath {
           makeLines(another.p0, another.p1, vertex1, currLines)
           //
           vertex0.idx = this.intersectedVertices.push(vertex0)
-          vertex1.idx = this.intersectedVertices.push(vertex1)
+          vertex1.idx = vertex0.idx
         })
         if (!intersecting) {
           currLines.push(elem)
         }
-        this.lines = Array.from(existLines)
+        this.lines = Array.from(remainedLines)
         currLines.forEach(obj => this.lines.push(obj))
       })
     }
@@ -203,22 +212,21 @@ class SimplePath {
 
     VisitIntersection (startPathCB:()=>void, coordCB:(x:number, y:number)=>void, closePathCB:()=>void, forward:boolean) {
       this.setStatus()
-      const seen = new Set<SimpleNode>()
+      const seen:number[] = []
       this.intersectedVertices.forEach((vertex) => {
-        if (seen.has(vertex)) return
+        if (seen.includes(vertex.idx)) return
         const stop = vertex
         let head = vertex
         startPathCB()
         do {
+          seen.push(head.idx)
           if (head.isEntry === forward) {
             do {
-              seen.add(head)
               coordCB(head.data.x, head.data.y)
               head = head.prevVertex
             } while (!head.isVertex)
           } else {
             do {
-              seen.add(head)
               coordCB(head.data.x, head.data.y)
               head = head.nextVertex
             } while (!head.isVertex)
@@ -229,13 +237,13 @@ class SimplePath {
       })
     }
 
-    drawXOR () {
-      this.paint.lineStyle(5, 0x77EB77)
-      this.paint.beginFill(0xFEEB77, 0.3)
-      let polygon:number[] = []
+    drawUnion () {
+      this.paint.lineStyle(this.viewSetting.lineWidth, this.viewSetting.lineColor, this.viewSetting.lineAlpha)
+      this.paint.beginFill(this.viewSetting.fillColor, this.viewSetting.fillAlpha)
+      let polygon:number[] = [] // Triangluaration by engine
       this.VisitIntersection(() => { polygon = [] }, (x, y) => { polygon.push(x, y) }, () => { this.paint.drawPolygon(polygon); this.paint.closePath() }, true)
       this.paint.endFill()
-      this.paint.beginFill(0xEB77FE, 0.3)
+      this.paint.beginFill(this.viewSetting.backColor, this.viewSetting.fillAlpha)
       this.VisitIntersection(() => { polygon = [] }, (x, y) => { polygon.push(x, y) }, () => { this.paint.drawPolygon(polygon); this.paint.closePath() }, false)
       this.paint.endFill()
     }
@@ -249,31 +257,39 @@ class SimplePath {
         drawPath.push(head.data.y)
         head = head.next
       } while (head !== stop)
-      this.paint.lineStyle(5, 0x77EB77)
-      this.paint.beginFill(0xFEEB77, 0.8)
+      this.paint.lineStyle(this.viewSetting.lineWidth, this.viewSetting.lineColor, this.viewSetting.lineAlpha)
+      this.paint.beginFill(this.viewSetting.fillColor, this.viewSetting.fillAlpha)
       this.paint.drawPolygon(drawPath)
       this.paint.closePath()
       this.paint.endFill()
     }
 
     drawFill () {
-      this.paint.cacheAsBitmap = false
       this.paint.clear()
       if (this.intersectedVertices.length !== 0) {
-        this.drawXOR()
+        this.drawUnion()
       } else {
         this.drawNonIntersection()
       }
-      this.paint.cacheAsBitmap = true
+      this.drawPoints()
     }
 
     drawLines () {
       this.paint.clear()
-      this.paint.lineStyle(2, 0xFEEB77, 1)
+      this.paint.lineStyle(this.viewSetting.lineWidth, this.viewSetting.lineColor, this.viewSetting.lineAlpha)
       this.lines.forEach((line) => {
         this.paint.moveTo(line.p0.data.x, line.p0.data.y)
         this.paint.lineTo(line.p1.data.x, line.p1.data.y)
       })
+      this.drawPoints()
+    }
+
+    drawPoints () {
+      this.paint.beginFill(this.viewSetting.pointColor, this.viewSetting.pointAlpha)
+      this.nodes.forEach((node) => {
+        this.paint.drawCircle(node.data.x, node.data.y, this.viewSetting.pointSize)
+      })
+      this.paint.endFill()
     }
 }
 export {

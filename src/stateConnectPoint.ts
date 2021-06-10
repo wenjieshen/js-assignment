@@ -13,11 +13,11 @@ class ConnectPoint extends State {
     helpLine? : PIXI.Graphics;
     helpCircle? : PIXI.Graphics;
     mouseTarget? : PIXI.Graphics;
-    animaDelta: number
+    aniScale: number
     onClick: () => void;
     onClickHandler: () => void;
-    onUpdate: () => void;
-    onUpdateHandler: () => void;
+    onUpdate: (delta:number) => void;
+    onUpdateHandler: (delta:number) => void;
     onKeyUp: (e: KeyboardEvent) => void;
     onKeyUpHandler: (e: KeyboardEvent) => void;
     onMouseOut: () => void;
@@ -50,21 +50,25 @@ class ConnectPoint extends State {
         const ctrl:StateCtrl = this.context.controller
         ctrl.change('insertPoint')
       }
-      this.onUpdate = function () {
+      this.onUpdate = function (delta:number) {
         if (this.app !== undefined) {
           const helpLine = this.helpLine!
+          const helpCircle = this.helpCircle!
           const lastPoint = this.context.currentPath!.tail.data
           const mousePos = this.app.renderer.plugins.interaction.mouse.global
           helpLine.clear()
-          helpLine.lineStyle(15, 0x000000, 0.8, 1, true)
+          helpLine.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
           helpLine.moveTo(lastPoint.x, lastPoint.y)
           helpLine.lineTo(mousePos.x, mousePos.y)
           // Helper circle
-          this.helpCircle!.scale.x = this.animaDelta
-          this.helpCircle!.scale.y = this.animaDelta
-          this.animaDelta += 0.1
-          if (this.animaDelta > 1.5) {
-            this.animaDelta = 1.0
+          helpCircle.clear()
+          helpCircle.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor)
+          helpCircle.drawCircle(mousePos.x, mousePos.y, this.aniScale)
+          const maxSize = this.context.setting.pointSize * 7.5
+          const v = 0.75
+          this.aniScale += delta * v
+          if (this.aniScale > maxSize) {
+            this.aniScale = this.context.setting.pointSize
           }
         }
       }
@@ -76,7 +80,7 @@ class ConnectPoint extends State {
       this.onKeyUpHandler = this.onKeyUp.bind(this)
       this.onClickHandler = this.onClick.bind(this)
       this.onUpdateHandler = this.onUpdate.bind(this)
-      this.animaDelta = 1
+      this.aniScale = this.context.setting.pointSize
     }
 
     /**
@@ -115,21 +119,13 @@ class ConnectPoint extends State {
         } else {
           this.helpCircle.clear()
         }
-        // Helper
-        this.mouseTarget = this.context.connection.get(this.context.currentPath!.head)!
-        this.mouseTarget!.tint = 0xC0392B
-        // Helper
-        this.helpCircle.lineStyle(3, 0x2E86C1)
-        this.helpCircle.beginFill(0xFFFFFF, 1)
-        this.helpCircle.drawCircle(0, 0, 6)
-        this.helpCircle.endFill()
-        this.helpCircle.x = this.mouseTarget!.x
-        this.helpCircle.y = this.mouseTarget!.y
         // Event
         this.app.renderer.view.addEventListener('click', this.onClickHandler)
         this.app.ticker.add(this.onUpdateHandler)
+        this.mouseTarget = this.context.connection.get(this.context.currentPath!.head)!
+        this.mouseTarget!.interactive = true
         this.mouseTarget!.on('mouseout', this.onMouseOutHander)
-        this.animaDelta = 1
+        this.aniScale = this.context.setting.pointSize
       }
     }
 
@@ -150,7 +146,7 @@ class ConnectPoint extends State {
         this.app.renderer.view.removeEventListener('click', this.onClickHandler)
         window.removeEventListener('keyup', this.onKeyUpHandler)
         this.mouseTarget?.removeListener('mouseout', this.onMouseOutHander)
-        this.mouseTarget!.tint = 0xFFFFFF
+        this.mouseTarget!.interactive = false
       }
     }
 }

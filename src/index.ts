@@ -11,7 +11,7 @@ const load = (app: PIXI.Application) => {
 
 const main = async () => {
   // Actual app
-  const app = new PIXI.Application()
+  const app = new PIXI.Application({ antialias: true })
 
   // Display application properly
   document.body.style.margin = '0'
@@ -46,7 +46,6 @@ const main = async () => {
   }
 
   app.ticker.add(update, context) */
-
   const stateCtrl = new StateCtrl()
   stateCtrl.injectApp(app)
 }

@@ -1,5 +1,6 @@
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
+import { PathViewSetting } from './simplePath'
 import { State } from './state'
 import { SimpleNode, SimplePath } from './stateControl'
 
@@ -7,6 +8,7 @@ import { SimpleNode, SimplePath } from './stateControl'
    * The class describes the state of editor when a point should be inserted
    */
 class InsertPoint extends State {
+    defaultPathViewSetting:PathViewSetting;
     name = 'InsertPoint'
     app?: PIXI.Application;
     onClick: () => void;
@@ -17,6 +19,17 @@ class InsertPoint extends State {
        */
     constructor (context: Context) {
       super(context)
+      this.defaultPathViewSetting = {
+        pointSize: this.context.setting.pointSize,
+        pointColor: this.context.setting.pointColor,
+        pointAlpha: this.context.setting.pointAlpha,
+        lineWidth: this.context.setting.lineWidth,
+        lineColor: this.context.setting.lineColor,
+        lineAlpha: this.context.setting.lineAlpha,
+        fillColor: this.context.setting.defaultFillColor,
+        backColor: this.context.setting.defaultBackColor,
+        fillAlpha: this.context.setting.defaultFillAlpha
+      }
       this.onClick = function () {
         if (this.app === undefined) {
           return
@@ -29,12 +42,12 @@ class InsertPoint extends State {
         this.app.stage.addChild(pointEntity)
         pointEntity.x = mousePos.x
         pointEntity.y = mousePos.y
-        pointEntity.hitArea = new PIXI.Rectangle(0, 0, 30, 30)
+        pointEntity.hitArea = new PIXI.Circle(0, 0, this.defaultPathViewSetting.pointSize * this.context.setting.hitScale)
         // Create a current path
-        const head = new SimpleNode(new PIXI.Point(pointEntity.x, pointEntity.y), 0)
+        const head = new SimpleNode(new PIXI.Point(pointEntity.x, pointEntity.y), 1)
         this.context.connection.set(head, pointEntity)
         this.context.mapping.set(pointEntity, head)
-        this.context.currentPath = new SimplePath(head, this.app.stage.addChild(new PIXI.Graphics()))
+        this.context.currentPath = new SimplePath(head, this.app.stage.addChild(new PIXI.Graphics()), this.defaultPathViewSetting)
         this.context.owner.set(head, this.context.currentPath)
         //
         this.context.controller.change('insertLine')

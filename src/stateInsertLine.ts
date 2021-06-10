@@ -83,7 +83,7 @@ class InsertLine extends State {
           const lastPoint = this.context.currentPath!.tail.data
           const mousePos = this.app.renderer.plugins.interaction.mouse.global
           helpLine.clear()
-          helpLine.lineStyle(15, 0x000000, 0.8, 1, true)
+          helpLine.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
           helpLine.moveTo(lastPoint.x, lastPoint.y)
           helpLine.lineTo(mousePos.x, mousePos.y)
         }
@@ -123,6 +123,11 @@ class InsertLine extends State {
           this.app.stage.addChild(this.helpLine)
         } else {
           this.helpLine.clear()
+        }
+        if (this.context.currentPath!.nodes.length > 2) {
+          const headEntity = this.context.connection.get(this.context.currentPath!.head)!
+          headEntity.on('mouseover', this.onMouseOverHeadHandler)
+          headEntity.interactive = true
         }
         this.app.renderer.view.addEventListener('click', this.onClickHandler)
         this.app.ticker.add(this.onUpdateHandler)

@@ -24,7 +24,27 @@ class StateCtrl {
         mapping: new Map<PIXI.Graphics, SimpleNode>(),
         owner: new Map<SimpleNode, SimplePath>(),
         pointTree: null,
-        path: []
+        path: [],
+        /** @todo Generate setting by file  */
+        setting: {
+          pointSize: 5,
+          pointColor: 0xf59042,
+          pointAlpha: 1,
+          hitScale: 1.5,
+          lineWidth: 3,
+          lineColor: 0xf5e642,
+          lineAlpha: 0.5,
+          helpLineWidth: 3.5,
+          helpLineColor: 0x4272f5,
+          helpLineAlpha: 1,
+          alignLineWidth: 2.5,
+          alignLineColor: 0xf54266,
+          alignLineAlpha: 1,
+          alignTolerance: 75,
+          defaultFillColor: 0x4278f5,
+          defaultBackColor: 0x42e3f5,
+          defaultFillAlpha: 0.3
+        }
       }
       // Create all state in advance.
       this.states = new Map()
