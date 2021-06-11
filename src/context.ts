@@ -23,12 +23,13 @@ interface Setting{
 }
 export interface Context{
     app:PIXI.Application|null
-    currentPath?:SimplePath|null
+    editingPath:SimplePath|null
+    selectedNode:SimpleNode[]
     controller:StateCtrl
-    connection:Map<SimpleNode, PIXI.Graphics>
-    mapping:Map<PIXI.Graphics, SimpleNode>
+    map2PIXI:Map<SimpleNode, PIXI.Graphics>
+    map2Node:Map<PIXI.DisplayObject, SimpleNode>
     owner:Map<SimpleNode, SimplePath>
     pointTree?:Quadtree|null
-    path:SimplePath[]
+    paths:SimplePath[]
     setting:Setting
 }

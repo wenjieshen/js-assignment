@@ -2,14 +2,13 @@
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
 import { State } from './state'
-import { SimplePath, SimpleNode, StateCtrl } from './stateControl'
+import { SimplePath, SimpleNode } from './stateControl'
 import { BeforeDeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
 class InsertLine extends State {
     name = 'InsertLine'
-    app?: PIXI.Application;
     helpLine? : PIXI.Graphics;
     onClick: () => void;
     onClickHandler: () => void;
@@ -28,7 +27,7 @@ class InsertLine extends State {
     constructor (context:Context) {
       super(context)
       this.onMouseOverOtherPath = function (e) {
-        console.log(e)
+        console.debug(e)
       }
       this.onMouseOverHead = function () {
         this.context.controller.change('connectPoint')
@@ -39,54 +38,53 @@ class InsertLine extends State {
           return
         }
         if (e.key === 'Esc' || e.key === 'Escape') {
-          if (this.app === undefined) return
-
-          if (this.context.currentPath!.count === 1) {
-            BeforeDeletePath(this.context, this.context.currentPath!)
-            delete this.context.currentPath
-            this.context.currentPath = null
+          if (this.context.editingPath!.count === 1) {
+            BeforeDeletePath(this.context, this.context.editingPath!)
+            this.context.editingPath = null
           }
-
-          const ctrl:StateCtrl = this.context.controller
-          ctrl.change('insertPoint')
+          this.context.controller.change('insertPoint')
         }
       }
       this.onClick = function () {
-        if (this.app === undefined) return
+        if (this.context.app === null) return
         // Initilize container
-        const connection:Map<SimpleNode, PIXI.Graphics> = this.context.connection
-        const mapping:Map<PIXI.Graphics, SimpleNode> = this.context.mapping
+        const map2PIXI:Map<SimpleNode, PIXI.Graphics> = this.context.map2PIXI
+        const map2Node:Map<PIXI.DisplayObject, SimpleNode> = this.context.map2Node
         const owner:Map<SimpleNode, SimplePath> = this.context.owner
         // Create new entity of engine
-        const mousePos = this.app.renderer.plugins.interaction.mouse.global
+        const mousePos = this.context.app.renderer.plugins.interaction.mouse.global
         const newEntity = new PIXI.Graphics()
         newEntity.x = mousePos.x
         newEntity.y = mousePos.y
-        this.app.stage.addChild(newEntity)
+        newEntity.hitArea = new PIXI.Circle(0, 0, this.context.setting.pointSize * this.context.setting.hitScale)
+        this.context.app.stage.addChild(newEntity)
         // Add the entity to my path
-        const node = this.context.currentPath!.addNewPoint(new PIXI.Point(newEntity.x, newEntity.y), this.context.pointTree!)
-        connection.set(node, newEntity)
-        mapping.set(newEntity, node)
-        owner.set(node, this.context.currentPath!)
+        const node = this.context.editingPath!.addNewPoint(new PIXI.Point(newEntity.x, newEntity.y), this.context.pointTree!)
+        map2PIXI.set(node, newEntity)
+        map2Node.set(newEntity, node)
+        owner.set(node, this.context.editingPath!)
         //
         // Add necessary events
-        const currentPath = this.context.currentPath!
-        if (currentPath.nodes.length > 2) {
-          const headEntity = connection.get(currentPath.head)!
+        const editingPath = this.context.editingPath!
+        if (editingPath.nodes.length > 2) {
+          const headEntity = map2PIXI.get(editingPath.head)!
           headEntity.on('mouseover', this.onMouseOverHeadHandler)
           headEntity.interactive = true
         }
+        //
+        if (editingPath.nodes.length === 2) {
+          this.context.paths.push(this.context.editingPath!)
+        }
       }
       this.onUpdate = function () {
-        if (this.app !== undefined) {
-          const helpLine = this.helpLine!
-          const lastPoint = this.context.currentPath!.tail.data
-          const mousePos = this.app.renderer.plugins.interaction.mouse.global
-          helpLine.clear()
-          helpLine.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
-          helpLine.moveTo(lastPoint.x, lastPoint.y)
-          helpLine.lineTo(mousePos.x, mousePos.y)
-        }
+        if (this.context.app === null) return
+        const helpLine = this.helpLine!
+        const lastPoint = this.context.editingPath!.tail.data
+        const mousePos = this.context.app.renderer.plugins.interaction.mouse.global
+        helpLine.clear()
+        helpLine.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
+        helpLine.moveTo(lastPoint.x, lastPoint.y)
+        helpLine.lineTo(mousePos.x, mousePos.y)
       }
       this.onKeyUpHandler = this.onKeyUp.bind(this)
       this.onClickHandler = this.onClick.bind(this)
@@ -116,23 +114,21 @@ class InsertLine extends State {
        * @param {string} prevState Notice the state which state has been switched.
        */
     enter (prevState:string) {
-      this.app = this.context.app!
-      if (this.app !== undefined) {
-        if (this.helpLine === undefined) {
-          this.helpLine = new PIXI.Graphics()
-          this.app.stage.addChild(this.helpLine)
-        } else {
-          this.helpLine.clear()
-        }
-        if (this.context.currentPath!.nodes.length > 2) {
-          const headEntity = this.context.connection.get(this.context.currentPath!.head)!
-          headEntity.on('mouseover', this.onMouseOverHeadHandler)
-          headEntity.interactive = true
-        }
-        this.app.renderer.view.addEventListener('click', this.onClickHandler)
-        this.app.ticker.add(this.onUpdateHandler)
-        window.addEventListener('keyup', this.onKeyUpHandler)
+      if (this.context.app === null) return
+      if (this.helpLine === undefined) {
+        this.helpLine = new PIXI.Graphics()
+        this.context.app.stage.addChild(this.helpLine)
+      } else {
+        this.helpLine.clear()
       }
+      if (this.context.editingPath!.nodes.length > 2) {
+        const headEntity = this.context.map2PIXI.get(this.context.editingPath!.head)!
+        headEntity.on('mouseover', this.onMouseOverHeadHandler)
+        headEntity.interactive = true
+      }
+      this.context.app.renderer.view.addEventListener('click', this.onClickHandler)
+      this.context.app.ticker.add(this.onUpdateHandler)
+      window.addEventListener('keyup', this.onKeyUpHandler)
     }
 
     /**
@@ -140,19 +136,18 @@ class InsertLine extends State {
        * @param {string} nextState Notice the state which one is next.
        */
     exit (nextState:string) {
-      if (this.app !== undefined) {
-        this.app.ticker.remove(this.onUpdateHandler)
-        if (this.helpLine !== undefined) {
-          this.helpLine.clear()
-        }
-        if (this.context.currentPath !== null) {
-          const headEntity = this.context.connection.get(this.context.currentPath!.head)!
-          headEntity.removeListener('mouseover', this.onMouseOverHeadHandler)
-          headEntity.interactive = false
-        }
-        this.app.renderer.view.removeEventListener('click', this.onClickHandler)
-        window.removeEventListener('keyup', this.onKeyUpHandler)
+      if (this.context.app === null) return
+      this.context.app.ticker.remove(this.onUpdateHandler)
+      if (this.helpLine !== undefined) {
+        this.helpLine.clear()
       }
+      if (this.context.editingPath !== null) {
+        const headEntity = this.context.map2PIXI.get(this.context.editingPath!.head)!
+        headEntity.removeListener('mouseover', this.onMouseOverHeadHandler)
+        headEntity.interactive = false
+      }
+      this.context.app.renderer.view.removeEventListener('click', this.onClickHandler)
+      window.removeEventListener('keyup', this.onKeyUpHandler)
     }
 }
 export {

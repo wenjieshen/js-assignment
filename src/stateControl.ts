@@ -6,6 +6,7 @@ import { ConnectPoint } from './stateConnectPoint'
 import { SimplePath, SimpleNode, SimpleLine } from './simplePath'
 import Quadtree from '@timohausmann/quadtree-js'
 import { Context } from './context'
+import { SelectedPoints } from './stateSelected'
 
 /** Class controls The states. */
 class StateCtrl {
@@ -18,13 +19,14 @@ class StateCtrl {
     constructor () {
       this.context = {
         app: null,
-        currentPath: null,
+        editingPath: null,
         controller: this,
-        connection: new Map<SimpleNode, PIXI.Graphics>(),
-        mapping: new Map<PIXI.Graphics, SimpleNode>(),
+        map2PIXI: new Map<SimpleNode, PIXI.Graphics>(),
+        map2Node: new Map<PIXI.Graphics, SimpleNode>(),
         owner: new Map<SimpleNode, SimplePath>(),
         pointTree: null,
-        path: [],
+        paths: [],
+        selectedNode: [],
         /** @todo Generate setting by file  */
         setting: {
           pointSize: 5,
@@ -52,6 +54,7 @@ class StateCtrl {
       this.states.set('insertPoint', this.currState)
       this.states.set('insertLine', new InsertLine(this.context))
       this.states.set('connectPoint', new ConnectPoint(this.context))
+      this.states.set('selectedPoints', new SelectedPoints(this.context))
     }
 
     /**
@@ -72,12 +75,12 @@ class StateCtrl {
        */
     change (nextState:string) {
       if (this.currState.allow(nextState)) {
-        console.log('from', this.currState.name)
+        console.debug('from', this.currState.name)
         const prevSatate = this.currState.name
         this.currState.exit(nextState)
         this.currState = this.states.get(nextState)!
         this.currState.enter(prevSatate)
-        console.log('to', nextState)
+        console.debug('to', nextState)
       }
     };
 }
