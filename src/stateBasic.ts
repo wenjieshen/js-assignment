@@ -14,8 +14,8 @@ export class StateBasic extends State {
   onClickHandler: () => void;
   onMouseOver: () => void
   onMouseOut: () => void
-  onClickNode: (e: PIXI.interaction.InteractionData) => void
-  onClickNodeHandler: (e: PIXI.interaction.InteractionData) => void
+  onMouseDownNode: (e: PIXI.interaction.InteractionData) => void
+  onMouseDownkNodeHandler: (e: PIXI.interaction.InteractionData) => void
   onMouseOverHandler: () => void
   onMouseOutHandler: () => void
   mouseOverNode = false
@@ -66,12 +66,12 @@ export class StateBasic extends State {
     this.onMouseOut = function () {
       this.mouseOverNode = false
     }
-    this.onClickNode = function (e:PIXI.interaction.InteractionData) {
+    this.onMouseDownNode = function (e:PIXI.interaction.InteractionData) {
       this.context.selectedNode.push(this.context.map2Node.get(e.target)!)
       this.context.controller.change('Seleted')
     }
     this.onClickHandler = this.onClick.bind(this)
-    this.onClickNodeHandler = this.onClickNode.bind(this)
+    this.onMouseDownkNodeHandler = this.onMouseDownNode.bind(this)
     this.onMouseOverHandler = this.onMouseOver.bind(this)
     this.onMouseOutHandler = this.onMouseOut.bind(this)
   }
@@ -107,7 +107,7 @@ export class StateBasic extends State {
         entity.interactive = true
         entity.addListener('mouseout', this.onMouseOutHandler)
         entity.addListener('mouseover', this.onMouseOverHandler)
-        entity.addListener('click', this.onClickNodeHandler)
+        entity.addListener('mousedown', this.onMouseDownkNodeHandler)
       })
     })
   }
@@ -126,7 +126,7 @@ export class StateBasic extends State {
         entity.interactive = false
         entity.removeListener('mouseout', this.onMouseOutHandler)
         entity.removeListener('mouseover', this.onMouseOverHandler)
-        entity.removeListener('click', this.onClickNodeHandler)
+        entity.removeListener('mousedown', this.onMouseDownkNodeHandler)
       })
     })
   }

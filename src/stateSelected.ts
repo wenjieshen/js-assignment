@@ -10,13 +10,15 @@ export class StateSelected extends State {
   helpRect? : PIXI.Graphics;
   helpLine? : PIXI.Graphics;
   helpCircle? : PIXI.Graphics;
-  pressShift: boolean = false
   draging: boolean = false
   mouseOverNode : boolean = true
   dragStatePos = new PIXI.Point()
+  shiftPress = false
   onClick: () => void;
   onClickHandler: () => void;
   onKeyUp: (e: KeyboardEvent) => void;
+  onKeyDown: (e: KeyboardEvent) => void;
+  onKeyDownHandler: (e: KeyboardEvent) => void;
   onKeyUpHandler: (e: KeyboardEvent) => void;
   onMouseOut: () => void;
   onMouseOutHandler : () => void;
@@ -24,7 +26,6 @@ export class StateSelected extends State {
   onClickNodeHandler: (e:PIXI.interaction.InteractionData) => void
   onMouseOver: () => void
   onMouseOverHandler: () => void
-  onKeyDown: (e: KeyboardEvent) => void;
   onMouseDown: (e: PIXI.interaction.InteractionEvent) => void;
   onMouseUp: () => void;
   onMouseMove: (e: PIXI.interaction.InteractionEvent) => void;
@@ -41,21 +42,17 @@ export class StateSelected extends State {
       if (this.context.app === null) return
       if (e.defaultPrevented) return
       switch (e.key) {
-        case 'Shift':
-          this.pressShift = false
-          break
-        case 'Delete':
-        case 'Esc':
-        case 'Escape':
+        case 'delete':
           this.context.controller.change('Basic')
+          break
+        case 'shift':
+          this.shiftPress = false
           break
         default:
           break
       }
     }
-    this.onKeyDown = function (e:KeyboardEvent) {
-      this.pressShift = true
-    }
+
     this.onClick = function () {
       if (!this.draging && !this.mouseOverNode) {
         this.context.controller.change('Basic')
@@ -68,31 +65,40 @@ export class StateSelected extends State {
       this.mouseOverNode = false
     }
     this.onClickNode = function (e:PIXI.interaction.InteractionData) {
-      if (!this.pressShift) return
+      this.draging = false
+      if (!this.shiftPress) return
       this.context.selectedNode.push(this.context.map2Node.get(e.target)!)
+      this.helpRect!.clear()
       this.helpRect!.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
       const rectSize = this.context.setting.pointSize * 2
       const offset = rectSize * 0.5
-      this.helpRect!.drawRect(this.context.selectedNode[0].data.x - offset, this.context.selectedNode[0].data.y - offset, rectSize, rectSize)
+      this.context.selectedNode.forEach((elem) => {
+        this.helpRect!.drawRect(elem.data.x - offset, elem.data.y - offset, rectSize, rectSize)
+      })
     }
     this.onMouseDown = function (e:PIXI.interaction.InteractionEvent) {
-      if (this.pressShift) return
+      if (this.shiftPress) return
       this.draging = true
       this.dragStatePos.copyFrom(e.data.global)
     }
     this.onMouseUp = function () {
       this.draging = false
+      this.helpLine!.clear()
     }
     this.onMouseMove = function (e:PIXI.interaction.InteractionEvent) {
       if (!this.draging) return
       const dir = new PIXI.Point(e.data.global.x - this.dragStatePos.x, e.data.global.y - this.dragStatePos.y)
       this.helpLine!.clear()
+      this.helpLine!.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
       this.context.selectedNode.forEach((node) => {
         const newPos = new PIXI.Point(node.data.x + dir.x, node.data.y + dir.y)
         this.helpLine!.moveTo(node.prev.data.x, node.prev.data.y)
         this.helpLine!.lineTo(newPos.x, newPos.y)
         this.helpLine!.lineTo(node.next.data.x, node.next.data.y)
       })
+    }
+    this.onKeyDown = function (event:KeyboardEvent) {
+      if (event.key === 'shift') this.shiftPress = true
     }
     this.onMouseOutHandler = this.onMouseOut.bind(this)
     this.onKeyUpHandler = this.onKeyUp.bind(this)
@@ -102,6 +108,7 @@ export class StateSelected extends State {
     this.onMouseDownHandler = this.onMouseDown.bind(this)
     this.onMouseUpHandler = this.onMouseUp.bind(this)
     this.onMouseMoveHandler = this.onMouseMove.bind(this)
+    this.onKeyDownHandler = this.onKeyDown.bind(this)
   }
 
   /**
@@ -146,15 +153,17 @@ export class StateSelected extends State {
       this.helpLine.clear()
     }
     this.mouseOverNode = true
+    this.draging = false
     this.helpRect!.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
     const rectSize = this.context.setting.pointSize * 2
     const offset = rectSize * 0.5
     this.helpRect!.drawRect(this.context.selectedNode[0].data.x - offset, this.context.selectedNode[0].data.y - offset, rectSize, rectSize)
     // Event
-    this.context.app.renderer.plugins.interaction.addListener('click', this.onClickHandler)
+    this.context.app.renderer.view.addEventListener('click', this.onClickHandler)
+    this.context.app.renderer.plugins.interaction.addListener('mouseup', this.onMouseUpHandler)
     this.context.app.renderer.plugins.interaction.addListener('mousedown', this.onMouseDownHandler)
     this.context.app.renderer.plugins.interaction.addListener('mousemove', this.onMouseMoveHandler)
-    this.context.app.renderer.plugins.interaction.addListener('mouseup', this.onMouseUpHandler)
+    window.addEventListener('keydown', this.onKeyDownHandler)
     window.addEventListener('keyup', this.onKeyUpHandler)
     this.context.paths.forEach((path) => {
       path.nodes.forEach((node) => {
@@ -180,10 +189,11 @@ export class StateSelected extends State {
       this.helpCircle.clear()
     }
     // Remove all event
-    this.context.app.renderer.plugins.interaction.removeListener('click', this.onClickHandler)
+    this.context.app.renderer.view.addEventListener('click', this.onClickHandler)
+    this.context.app.renderer.plugins.interaction.removeListener('mouseup', this.onMouseUpHandler)
     this.context.app.renderer.plugins.interaction.removeListener('mousedown', this.onMouseDownHandler)
     this.context.app.renderer.plugins.interaction.removeListener('mousemove', this.onMouseMoveHandler)
-    this.context.app.renderer.plugins.interaction.removeListener('mouseup', this.onMouseUpHandler)
+    window.removeEventListener('keydown', this.onKeyDownHandler)
     window.removeEventListener('keyup', this.onKeyUpHandler)
     this.context.selectedNode = []
     this.context.paths.forEach((path) => {
