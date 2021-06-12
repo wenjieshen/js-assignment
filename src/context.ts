@@ -1,7 +1,7 @@
 import Quadtree from '@timohausmann/quadtree-js'
 import * as PIXI from 'pixi.js'
 import { SimplePath, SimpleNode } from './simplePath'
-import { StateCtrl } from './stateControl'
+import { StateController } from './stateController'
 interface Setting{
     pointSize:number
     pointColor:number
@@ -25,7 +25,7 @@ export interface Context{
     app:PIXI.Application|null
     editingPath:SimplePath|null
     selectedNode:SimpleNode[]
-    controller:StateCtrl
+    controller:StateController
     map2PIXI:Map<SimpleNode, PIXI.Graphics>
     map2Node:Map<PIXI.DisplayObject, SimpleNode>
     owner:Map<SimpleNode, SimplePath>

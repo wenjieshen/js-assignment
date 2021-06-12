@@ -1,14 +1,14 @@
 
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
-import { State } from './state'
-import { SimplePath } from './stateControl'
+import { State, ConcreteState } from './state'
+import { SimplePath } from './stateController'
 import { BeforeDeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
-class ConnectPoint extends State {
-    name = 'ConnectPoint'
+export class StateClosePath extends State {
+    name = 'StateClosePath'
     helpLine? : PIXI.Graphics;
     helpCircle? : PIXI.Graphics;
     closeTarget? : PIXI.Graphics;
@@ -37,14 +37,14 @@ class ConnectPoint extends State {
             BeforeDeletePath(this.context, this.context.editingPath!)
             this.context.editingPath = null
           }
-          this.context.controller.change('insertPoint')
+          this.context.controller.change('Basic')
         }
       }
       this.onClick = function () {
         if (this.context.app === null) return
         const currGraph:SimplePath = this.context.editingPath!
         currGraph!.closePath()
-        this.context.controller.change('insertPoint')
+        this.context.controller.change('Basic')
       }
       this.onUpdate = function (delta:number) {
         if (this.context.app === null) return
@@ -68,7 +68,7 @@ class ConnectPoint extends State {
         }
       }
       this.onMouseOut = function () {
-        this.context.controller.change('insertLine')
+        this.context.controller.change('EditPath')
       }
       this.onMouseOutHander = this.onMouseOut.bind(this)
       this.onKeyUpHandler = this.onKeyUp.bind(this)
@@ -79,15 +79,15 @@ class ConnectPoint extends State {
 
     /**
        * Confirm there is a directly connect to next state
-       * @param {string} nextState Notice the state which one is next.
+       * @param {ConcreteState} nextState Notice the state which one is next.
        * @return {boolean} whether the state is able to jump to the next state.
        */
-    allow (nextState: string): boolean {
+    allow (nextState: ConcreteState): boolean {
       // TODO: Use strategy pattern
       switch (nextState) {
-        case 'insertLine':
+        case 'Basic':
           return true
-        case 'insertPoint':
+        case 'EditPath':
           return true
         default:
       }
@@ -96,9 +96,9 @@ class ConnectPoint extends State {
 
     /**
        * Callback when state starts
-       * @param {string} prevState Notice the state which state has been switched.
+       * @param {ConcreteState} prevState Notice the state which state has been switched.
        */
-    enter (prevState:string) {
+    enter (prevState:ConcreteState) {
       if (this.context.app === null) return
       if (this.helpLine === undefined) {
         this.helpLine = new PIXI.Graphics()
@@ -140,7 +140,4 @@ class ConnectPoint extends State {
       this.closeTarget?.removeListener('mouseout', this.onMouseOutHander)
       this.closeTarget!.interactive = false
     }
-}
-export {
-  ConnectPoint
 }

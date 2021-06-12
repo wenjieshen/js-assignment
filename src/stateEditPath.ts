@@ -1,14 +1,14 @@
 
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
-import { State } from './state'
-import { SimplePath, SimpleNode } from './stateControl'
+import { State, ConcreteState } from './state'
+import { SimplePath, SimpleNode } from './stateController'
 import { BeforeDeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
-class InsertLine extends State {
-    name = 'InsertLine'
+export class StateEditPath extends State {
+    name = 'StateEditPath'
     helpLine? : PIXI.Graphics;
     onClick: () => void;
     onClickHandler: () => void;
@@ -30,7 +30,7 @@ class InsertLine extends State {
         console.debug(e)
       }
       this.onMouseOverHead = function () {
-        this.context.controller.change('connectPoint')
+        this.context.controller.change('ClosePath')
       }
       this.onMouseOverHeadHandler = this.onMouseOverHead.bind(this)
       this.onKeyUp = function (e:KeyboardEvent) {
@@ -42,7 +42,7 @@ class InsertLine extends State {
             BeforeDeletePath(this.context, this.context.editingPath!)
             this.context.editingPath = null
           }
-          this.context.controller.change('insertPoint')
+          this.context.controller.change('Basic')
         }
       }
       this.onClick = function () {
@@ -97,12 +97,12 @@ class InsertLine extends State {
        * @param {string} nextState Notice the state which one is next.
        * @return {boolean} whether the state is able to jump to the next state.
        */
-    allow (nextState: string): boolean {
+    allow (nextState: ConcreteState): boolean {
       // TODO: Use strategy pattern
       switch (nextState) {
-        case 'insertPoint':
+        case 'Basic':
           return true
-        case 'connectPoint':
+        case 'ClosePath':
           return true
         default:
       }
@@ -113,7 +113,7 @@ class InsertLine extends State {
        * Callback when state starts
        * @param {string} prevState Notice the state which state has been switched.
        */
-    enter (prevState:string) {
+    enter (prevState:ConcreteState) {
       if (this.context.app === null) return
       if (this.helpLine === undefined) {
         this.helpLine = new PIXI.Graphics()
@@ -135,7 +135,7 @@ class InsertLine extends State {
        * Callback when state exit
        * @param {string} nextState Notice the state which one is next.
        */
-    exit (nextState:string) {
+    exit (nextState:ConcreteState) {
       if (this.context.app === null) return
       this.context.app.ticker.remove(this.onUpdateHandler)
       if (this.helpLine !== undefined) {
@@ -149,7 +149,4 @@ class InsertLine extends State {
       this.context.app.renderer.view.removeEventListener('click', this.onClickHandler)
       window.removeEventListener('keyup', this.onKeyUpHandler)
     }
-}
-export {
-  InsertLine
 }

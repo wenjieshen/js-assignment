@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js'
-import { StateCtrl } from './stateControl'
+import { StateController } from './stateController'
 const backgroundPath = 'assets/Green_3_gridbox.png'
 const load = (app: PIXI.Application) => {
   return new Promise<void>((resolve) => {
@@ -46,7 +46,7 @@ const main = async () => {
   }
 
   app.ticker.add(update, context) */
-  const stateCtrl = new StateCtrl()
+  const stateCtrl = new StateController()
   stateCtrl.injectApp(app)
 }
 

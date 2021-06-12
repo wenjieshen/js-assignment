@@ -1,12 +1,12 @@
 
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
-import { State } from './state'
+import { ConcreteState, State } from './state'
 /**
    * The class describes the state of editor when a line should be inserted
    */
-export class SelectedPoints extends State {
-  name = 'SelectedPoints'
+export class StateSelected extends State {
+  name = 'StateSelected'
   helpRect? : PIXI.Graphics;
   helpLine? : PIXI.Graphics;
   helpCircle? : PIXI.Graphics;
@@ -47,7 +47,7 @@ export class SelectedPoints extends State {
         case 'Delete':
         case 'Esc':
         case 'Escape':
-          this.context.controller.change('insertPoint')
+          this.context.controller.change('Basic')
           break
         default:
           break
@@ -58,7 +58,7 @@ export class SelectedPoints extends State {
     }
     this.onClick = function () {
       if (!this.draging && !this.mouseOverNode) {
-        this.context.controller.change('insertPoint')
+        this.context.controller.change('Basic')
       }
     }
     this.onMouseOver = function () {
@@ -106,13 +106,13 @@ export class SelectedPoints extends State {
 
   /**
        * Confirm there is a directly connect to next state
-       * @param {string} nextState Notice the state which one is next.
+       * @param {ConcreteState} nextState Notice the state which one is next.
        * @return {boolean} whether the state is able to jump to the next state.
        */
-  allow (nextState: string): boolean {
+  allow (nextState: ConcreteState): boolean {
     // TODO: Use strategy pattern
     switch (nextState) {
-      case 'insertPoint':
+      case 'Basic':
         return true
       default:
     }
@@ -121,9 +121,9 @@ export class SelectedPoints extends State {
 
   /**
        * Callback when state starts
-       * @param {string} prevState Notice the state which state has been switched.
+       * @param {ConcreteState} prevState Notice the state which state has been switched.
        */
-  enter (prevState:string) {
+  enter (prevState:ConcreteState) {
     // Initialization
     if (this.context.app === null) return
     /** @todo Extract a inline function (I don't know the best way in TypeScript) */

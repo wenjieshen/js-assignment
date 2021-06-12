@@ -1,7 +1,7 @@
 import { Context } from './context'
 import { SimplePath } from './simplePath'
 
-const BeforeDeletePath = function (context:Context, path:SimplePath) {
+export const BeforeDeletePath = function (context:Context, path:SimplePath) {
   context.app!.stage.removeChild(path.paint)
   path.nodes.forEach((node) => {
     const headEntity = context.map2PIXI.get(node)!
@@ -14,7 +14,4 @@ const BeforeDeletePath = function (context:Context, path:SimplePath) {
   context.paths.forEach((elem) => {
     elem.insertDataIntoTree(context.pointTree!)
   })
-}
-export {
-  BeforeDeletePath
 }

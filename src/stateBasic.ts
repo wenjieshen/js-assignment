@@ -1,15 +1,15 @@
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
 import { PathViewSetting } from './simplePath'
-import { State } from './state'
-import { SimpleNode, SimplePath } from './stateControl'
+import { State, ConcreteState } from './state'
+import { SimpleNode, SimplePath } from './stateController'
 
 /**
    * The class describes the state of editor when a point should be inserted
    */
-class InsertPoint extends State {
+export class StateBasic extends State {
   defaultPathViewSetting:PathViewSetting;
-  name = 'InsertPoint'
+  name = 'StateBasic'
   onClick: () => void;
   onClickHandler: () => void;
   onMouseOver: () => void
@@ -58,7 +58,7 @@ class InsertPoint extends State {
       this.context.editingPath = new SimplePath(head, this.context.app.stage.addChild(new PIXI.Graphics()), this.defaultPathViewSetting)
       this.context.owner.set(head, this.context.editingPath)
       //
-      this.context.controller.change('insertLine')
+      this.context.controller.change('EditPath')
     }
     this.onMouseOver = function () {
       this.mouseOverNode = true
@@ -68,7 +68,7 @@ class InsertPoint extends State {
     }
     this.onClickNode = function (e:PIXI.interaction.InteractionData) {
       this.context.selectedNode.push(this.context.map2Node.get(e.target)!)
-      this.context.controller.change('selectedPoints')
+      this.context.controller.change('Seleted')
     }
     this.onClickHandler = this.onClick.bind(this)
     this.onClickNodeHandler = this.onClickNode.bind(this)
@@ -81,12 +81,12 @@ class InsertPoint extends State {
        * @param {string} nextState Notice the state which one is next.
        * @return {boolean} whether the state is able to jump to the next state.
        */
-  allow (nextState: string): boolean {
+  allow (nextState: ConcreteState): boolean {
     // TODO: Use strategy pattern
     switch (nextState) {
-      case 'insertLine':
+      case 'EditPath':
         return true
-      case 'selectedPoints':
+      case 'Seleted':
         return true
       default:
     }
@@ -95,10 +95,10 @@ class InsertPoint extends State {
 
   /**
        * Callback when state starts
-       * @param {string} prevState Notice the state which state has been switched.
+       * @param {ConcreteState} prevState Notice the state which state has been switched.
        */
-  enter (prevState:string) {
-    this.mouseOverNode = (prevState !== 'none' && prevState !== 'selectedPoints')
+  enter (prevState:ConcreteState) {
+    this.mouseOverNode = (prevState !== 'None' && prevState !== 'Seleted')
     this.context.editingPath = null
     this.context.app!.renderer.view.addEventListener('click', this.onClickHandler)
     this.context.paths.forEach((path) => {
@@ -116,7 +116,7 @@ class InsertPoint extends State {
        * Callback when state exit
        * @param {string} nextState Notice the state which one is next.
        */
-  exit (nextState:string) {
+  exit (nextState:ConcreteState) {
     if (this.context.app === null) return
     this.mouseOverNode = false
     this.context.app.renderer.view.removeEventListener('click', this.onClickHandler)
@@ -130,8 +130,4 @@ class InsertPoint extends State {
       })
     })
   }
-}
-
-export {
-  InsertPoint
 }

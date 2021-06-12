@@ -1,17 +1,17 @@
 import * as PIXI from 'pixi.js'
-import { State } from './state'
-import { InsertPoint } from './stateInsertPoint'
-import { InsertLine } from './stateInsertLine'
-import { ConnectPoint } from './stateConnectPoint'
+import { ConcreteState, State } from './state'
+import { StateBasic } from './stateBasic'
+import { StateEditPath } from './stateEditPath'
+import { StateClosePath } from './stateConnectPoint'
 import { SimplePath, SimpleNode, SimpleLine } from './simplePath'
 import Quadtree from '@timohausmann/quadtree-js'
 import { Context } from './context'
-import { SelectedPoints } from './stateSelected'
+import { StateSelected } from './stateSelected'
 
 /** Class controls The states. */
-class StateCtrl {
+export class StateController {
     context: Context
-    states: Map<string, State>
+    states: Map<ConcreteState, State>
     currState: State;
     /**
          * constructor of StateCtrl
@@ -50,11 +50,11 @@ class StateCtrl {
       }
       // Create all state in advance.
       this.states = new Map()
-      this.currState = new InsertPoint(this.context)
-      this.states.set('insertPoint', this.currState)
-      this.states.set('insertLine', new InsertLine(this.context))
-      this.states.set('connectPoint', new ConnectPoint(this.context))
-      this.states.set('selectedPoints', new SelectedPoints(this.context))
+      this.currState = new StateBasic(this.context)
+      this.states.set('Basic', this.currState)
+      this.states.set('EditPath', new StateEditPath(this.context))
+      this.states.set('ClosePath', new StateClosePath(this.context))
+      this.states.set('Seleted', new StateSelected(this.context))
     }
 
     /**
@@ -65,15 +65,15 @@ class StateCtrl {
       this.context.app = app
       this.context.pointTree = new Quadtree({ x: 0, y: 0, width: app.renderer.width, height: app.renderer.height })
       // Default state is Insert Point
-      this.currState = this.states.get('insertPoint')!
-      this.currState.enter('none')
+      this.currState = this.states.get('Basic')!
+      this.currState.enter('None')
     }
 
     /**
        * Change the state to next state
        * @param {string} nextState
        */
-    change (nextState:string) {
+    change (nextState:ConcreteState) {
       if (this.currState.allow(nextState)) {
         console.debug('from', this.currState.name)
         const prevSatate = this.currState.name
@@ -85,7 +85,6 @@ class StateCtrl {
     };
 }
 export {
-  StateCtrl,
   SimplePath,
   SimpleNode,
   SimpleLine

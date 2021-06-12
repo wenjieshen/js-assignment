@@ -1,8 +1,9 @@
 import { Context } from './context'
+export type ConcreteState = 'None' | 'Basic' | 'EditPath' | 'ClosePath' | 'Seleted'
 /**
    * The class describes the state of the editor
    */
-class State {
+export abstract class State {
   name: any;
   context: Context;
   /**
@@ -18,24 +19,16 @@ class State {
      * @param {string} _nextState Notice the state which one is next.
      * @return {boolean} whether the state is able to jump to the next state.
      */
-  allow (nextState:string): boolean {
-    return false
-  }
+  abstract allow (nextState:ConcreteState): boolean;
 
   /**
      * Callback when state starts
      * @param {string} prevState Notice the state which state has been switched.
      */
-  enter (prevState:string) {
-  }
-
+   abstract enter (prevState:ConcreteState): void;
   /**
      * Callback when state exit
      * @param {string} nextState Notice the state which one is next.
      */
-  exit (nextState:string) {
-  }
-}
-export {
-  State
+  abstract exit (nextState:ConcreteState): void;
 }
