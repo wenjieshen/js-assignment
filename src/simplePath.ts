@@ -2,7 +2,6 @@ import * as PIXI from 'pixi.js'
 import Quadtree, { Rect } from '@timohausmann/quadtree-js'
 
 class SimpleNode {
-    idx:number
     data:PIXI.Point;
     next:SimpleNode
     prev:SimpleNode
@@ -10,13 +9,13 @@ class SimpleNode {
     prevVertex:SimpleNode
     isVertex:boolean = false
     isEntry:boolean = false
-    constructor (data:PIXI.Point, idx:number) {
+    key?:number
+    constructor (data:PIXI.Point) {
       this.data = data
       this.next = this
       this.prev = this
       this.nextVertex = this
       this.prevVertex = this
-      this.idx = idx
     }
 
     insert (node:SimpleNode) {
@@ -90,23 +89,22 @@ class SimplePath {
     head:SimpleNode;
     tail:SimpleNode;
     count = 0
-    nodes:SimpleNode[];
+    vertexKey = 0
+    nodes = new Set<SimpleNode>();
     paint:PIXI.Graphics;
-    lines:SimpleLine[];
+    lines:Set<SimpleLine> = new Set<SimpleLine>();
     aabbMax: PIXI.Point = new PIXI.Point();
     aabbMin:PIXI.Point = new PIXI.Point();
     sum:number = 0;
-    intersectedVertices:SimpleNode[] = []
+    intersectedVertices = new Map<number, SimpleNode>()
     vertexPair:Map<SimpleNode, SimpleNode> = new Map<SimpleNode, SimpleNode>()
     viewSetting:PathViewSetting
+    isClosed = false
     constructor (head:SimpleNode, paint:PIXI.Graphics, viewSetting:PathViewSetting) {
       this.head = head
       this.tail = head
-      this.nodes = []
-      this.lines = []
-      this.nodes.push(head)
+      this.nodes.add(head)
       this.paint = paint
-      this.count = 1
       this.aabbMax.x = head.data.x
       this.aabbMax.y = head.data.y
       this.aabbMin.x = head.data.x
@@ -116,9 +114,9 @@ class SimplePath {
     }
 
     addNewPoint (coord:PIXI.Point, pointTree: Quadtree) {
-      const node = new SimpleNode(coord, this.count)
+      const node = new SimpleNode(coord)
       // Insert into my data structure
-      this.nodes.push(node)
+      this.nodes.add(node)
       this.tail.insert(node)
       this.tail = this.tail.next
       // Insert into quadtree
@@ -128,8 +126,7 @@ class SimplePath {
       this.aabbMax.x = Math.max(this.aabbMax.x, coord.x); this.aabbMax.y = Math.max(this.aabbMax.x, coord.y)
       this.aabbMin.x = Math.min(this.aabbMin.x, coord.x); this.aabbMin.y = Math.min(this.aabbMin.x, coord.y)
       // Create segment
-      const line = new SimpleLine(node.prev, node)
-      this.addLines([line])
+      this.addLines(new SimpleLine(node.prev, node))
       // Calulate signed area
       this.sum += (coord.x - this.tail.data.x) * (coord.y + this.tail.data.y)
       // Draw Lines
@@ -144,49 +141,51 @@ class SimplePath {
      * @param modifiedLines The line has been modified
      * @todo Use sweep line when the number of input is greather than log(n)
      */
-    addLines (modifiedLines:SimpleLine[]) {
+    addLines (modifiedLine:SimpleLine) {
       const point = new PIXI.Point()
       /** @todo Is it a inline function? */
       const makeLines = function (p0: SimpleNode, p1: SimpleNode, v: SimpleNode, arr: SimpleLine[]) {
         p0.insertVertex(v)
-        arr.push(new SimpleLine(p0, v))
-        arr.push(new SimpleLine(v, p1))
+        const l0 = new SimpleLine(p0, v)
+        const l1 = new SimpleLine(v, p1)
+        arr.push(l0)
+        arr.push(l1)
       }
-      modifiedLines.forEach((elem) => {
-        const remainedLines:Set<SimpleLine> = new Set<SimpleLine>(this.lines)
-        const currLines:SimpleLine[] = []
-        let intersecting = false
-        this.lines.forEach((another) => {
-          if (another === elem || elem.p0 === another.p1 || elem.p1 === another.p0) return
-          if (!elem.intersect(another, point)) return
-          // Insert interasection vertex
-          intersecting = true
-          remainedLines.delete(another)
-          const vertex0 = new SimpleNode(new PIXI.Point(point.x, point.y), -1)
-          vertex0.isVertex = true
-          const vertex1 = new SimpleNode(new PIXI.Point(point.x, point.y), -1)
-          vertex1.isVertex = true
-          // Make pair
-          this.vertexPair.set(vertex0, vertex1)
-          this.vertexPair.set(vertex1, vertex0)
-          // Vertices
-          makeLines(elem.p0, elem.p1, vertex0, currLines)
-          makeLines(another.p0, another.p1, vertex1, currLines)
-          //
-          vertex0.idx = this.intersectedVertices.push(vertex0)
-          vertex1.idx = vertex0.idx
-        })
-        if (!intersecting) {
-          currLines.push(elem)
-        }
-        this.lines = Array.from(remainedLines)
-        currLines.forEach(obj => this.lines.push(obj))
+
+      const remainedLines:Set<SimpleLine> = new Set<SimpleLine>(this.lines)
+      const currLines:SimpleLine[] = []
+      let intersecting = false
+      this.lines.forEach((another) => {
+        if (another === modifiedLine || modifiedLine.p0 === another.p1 || modifiedLine.p1 === another.p0) return
+        if (!modifiedLine.intersect(another, point)) return
+        // Insert interasection vertex
+        intersecting = true
+        remainedLines.delete(another)
+        const vertex0 = new SimpleNode(new PIXI.Point(point.x, point.y))
+        vertex0.isVertex = true
+        const vertex1 = new SimpleNode(new PIXI.Point(point.x, point.y))
+        vertex1.isVertex = true
+        // Make pair
+        this.vertexPair.set(vertex0, vertex1)
+        this.vertexPair.set(vertex1, vertex0)
+        // Vertices
+        makeLines(modifiedLine.p0, modifiedLine.p1, vertex0, currLines)
+        makeLines(another.p0, another.p1, vertex1, currLines)
+        //
+        vertex0.key = vertex1.key = this.vertexKey
+        this.intersectedVertices.set(this.vertexKey++, vertex0)
       })
+      if (!intersecting) {
+        currLines.push(modifiedLine)
+      }
+      this.lines = remainedLines
+      currLines.forEach(obj => this.lines.add(obj))
     }
 
     closePath () {
-      const line = new SimpleLine(this.tail, this.tail.next)
-      this.addLines([line])
+      this.isClosed = true
+      const currLine = new SimpleLine(this.tail, this.tail.next)
+      this.addLines(currLine)
       this.drawFill()
     }
 
@@ -212,14 +211,14 @@ class SimplePath {
 
     VisitIntersection (startPathCB:()=>void, coordCB:(x:number, y:number)=>void, closePathCB:()=>void, forward:boolean) {
       this.setStatus()
-      const seen:number[] = []
+      const seen = new Set<number>()
       this.intersectedVertices.forEach((vertex) => {
-        if (seen.includes(vertex.idx)) return
+        if (seen.has(vertex.key!)) return
         const stop = vertex
         let head = vertex
         startPathCB()
         do {
-          seen.push(head.idx)
+          seen.add(head.key!)
           if (head.isEntry === forward) {
             do {
               coordCB(head.data.x, head.data.y)
@@ -266,7 +265,7 @@ class SimplePath {
 
     drawFill () {
       this.paint.clear()
-      if (this.intersectedVertices.length !== 0) {
+      if (this.intersectedVertices.size !== 0) {
         this.drawUnion()
       } else {
         this.drawNonIntersection()
@@ -290,6 +289,49 @@ class SimplePath {
         this.paint.drawCircle(node.data.x, node.data.y, this.viewSetting.pointSize)
       })
       this.paint.endFill()
+    }
+
+    rebuildLine (head:SimpleNode, forward:boolean) {
+      let curr = head
+      const arr = []
+      do {
+        if (curr.isVertex) {
+          arr.push(curr)
+        }
+        curr = forward ? curr.nextVertex : curr.prevVertex
+      } while (curr.isVertex)
+      arr.forEach(element => {
+        const neighbor = this.vertexPair.get(element)!
+        neighbor.prevVertex.nextVertex = neighbor.nextVertex
+        neighbor.nextVertex.prevVertex = neighbor.prevVertex
+        this.vertexPair.delete(neighbor)
+        element.prevVertex.nextVertex = element.nextVertex
+        element.nextVertex.prevVertex = element.prevVertex
+        this.vertexPair.delete(element)
+        this.intersectedVertices.delete(element.key!)
+      })
+      curr = head
+      this.lines.clear()
+      if (forward) {
+        do {
+          this.lines.add(new SimpleLine(curr.prevVertex, curr))
+          curr = curr.prevVertex
+        } while (curr !== head.next)
+        this.addLines(new SimpleLine(head, head.next))
+      } else {
+        do {
+          this.lines.add(new SimpleLine(curr, curr.nextVertex))
+          curr = curr.prevVertex
+        } while (curr !== head.next)
+        this.addLines(new SimpleLine(head.prev,head))
+      }
+    }
+
+    MovePoints (modifiedNode:SimpleNode, dir:PIXI.Point) {
+      modifiedNode.data.x += dir.x
+      modifiedNode.data.y += dir.y
+      this.rebuildLine(modifiedNode, true)
+      this.rebuildLine(modifiedNode, false)
     }
 }
 export {

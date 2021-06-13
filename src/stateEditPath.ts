@@ -66,13 +66,13 @@ export class StateEditPath extends State {
         //
         // Add necessary events
         const editingPath = this.context.editingPath!
-        if (editingPath.nodes.length > 2) {
+        if (editingPath.nodes.size > 2) {
           const headEntity = map2PIXI.get(editingPath.head)!
           headEntity.on('mouseover', this.onMouseOverHeadHandler)
           headEntity.interactive = true
         }
         //
-        if (editingPath.nodes.length === 2) {
+        if (editingPath.nodes.size === 2) {
           this.context.paths.push(this.context.editingPath!)
         }
       }
@@ -121,7 +121,7 @@ export class StateEditPath extends State {
       } else {
         this.helpLine.clear()
       }
-      if (this.context.editingPath!.nodes.length > 2) {
+      if (this.context.editingPath!.nodes.size > 2) {
         const headEntity = this.context.map2PIXI.get(this.context.editingPath!.head)!
         headEntity.on('mouseover', this.onMouseOverHeadHandler)
         headEntity.interactive = true

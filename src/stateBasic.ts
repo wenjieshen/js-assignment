@@ -37,7 +37,6 @@ export class StateBasic extends State {
       fillAlpha: this.context.setting.defaultFillAlpha
     }
     this.onClick = function () {
-      console.debug(this.mouseOverNode)
       if (this.context.app === null) return
       if (this.mouseOverNode) return
       const mousePos = this.context.app.renderer.plugins.interaction.mouse.global
@@ -52,7 +51,7 @@ export class StateBasic extends State {
       newEntity.y = mousePos.y
       newEntity.hitArea = new PIXI.Circle(0, 0, this.context.setting.pointSize * this.context.setting.hitScale)
       // Create a current path
-      const head = new SimpleNode(new PIXI.Point(newEntity.x, newEntity.y), 1)
+      const head = new SimpleNode(new PIXI.Point(newEntity.x, newEntity.y))
       this.context.map2PIXI.set(head, newEntity)
       this.context.map2Node.set(newEntity, head)
       this.context.editingPath = new SimplePath(head, this.context.app.stage.addChild(new PIXI.Graphics()), this.defaultPathViewSetting)

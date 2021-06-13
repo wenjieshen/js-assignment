@@ -1,7 +1,7 @@
 
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
-import { SimpleNode } from './simplePath';
+import { SimpleNode, SimplePath } from './simplePath'
 import { ConcreteState, State } from './state'
 /**
    * The class describes the state of editor when a line should be inserted
@@ -15,8 +15,6 @@ export class StateSelected extends State {
   mouseOverNode : boolean = true
   dragStatePos = new PIXI.Point()
   shiftPress = false
-  onClick: () => void;
-  onClickHandler: () => void;
   onKeyUp: (e: KeyboardEvent) => void;
   onKeyDown: (e: KeyboardEvent) => void;
   onKeyDownHandler: (e: KeyboardEvent) => void;
@@ -28,11 +26,12 @@ export class StateSelected extends State {
   onMouseOver: () => void
   onMouseOverHandler: () => void
   onMouseDown: (e: PIXI.interaction.InteractionEvent) => void;
-  onMouseUp: () => void;
+  onMouseUp: (e:PIXI.interaction.InteractionEvent) => void;
   onMouseMove: (e: PIXI.interaction.InteractionEvent) => void;
   onMouseDownHandler: (e: PIXI.interaction.InteractionEvent) => void;
-  onMouseUpHandler: () => void;
+  onMouseUpHandler: (e:PIXI.interaction.InteractionEvent) => void;
   onMouseMoveHandler: (e: PIXI.interaction.InteractionEvent) => void;
+  drawSelectedNode: () => void
   /**
        * constructor of InsertPoint
        * @param {Map} context The properties will be used in every state.
@@ -43,7 +42,7 @@ export class StateSelected extends State {
       if (this.context.app === null) return
       if (e.defaultPrevented) return
       switch (e.key) {
-        case 'delete':
+        case 'Delete':
           this.context.controller.change('Basic')
           break
         case 'Shift':
@@ -53,22 +52,13 @@ export class StateSelected extends State {
           break
       }
     }
-
-    this.onClick = function () {
-      if (!this.draging && !this.mouseOverNode) {
-        this.context.controller.change('Basic')
-      }
-    }
     this.onMouseOver = function () {
       this.mouseOverNode = true
     }
     this.onMouseOut = function () {
       this.mouseOverNode = false
     }
-    this.onClickNode = function (e:PIXI.interaction.InteractionData) {
-      this.draging = false
-      if (!this.shiftPress) return
-      this.context.selectedNode.push(this.context.map2Node.get(e.target)!)
+    this.drawSelectedNode = function () {
       this.helpRect!.clear()
       this.helpRect!.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
       const rectSize = this.context.setting.pointSize * 2
@@ -77,19 +67,46 @@ export class StateSelected extends State {
         this.helpRect!.drawRect(elem.data.x - offset, elem.data.y - offset, rectSize, rectSize)
       })
     }
+    this.onClickNode = function (e:PIXI.interaction.InteractionData) {
+      this.draging = false
+      if (!this.shiftPress) return
+      this.context.selectedNode.push(this.context.map2Node.get(e.target)!)
+      this.drawSelectedNode()
+    }
     this.onMouseDown = function (e:PIXI.interaction.InteractionEvent) {
       if (this.shiftPress) return
       this.draging = true
       this.dragStatePos.copyFrom(e.data.global)
     }
-    this.onMouseUp = function () {
+    this.onMouseUp = function (e:PIXI.interaction.InteractionEvent) {
       this.draging = false
-      this.helpLine!.clear()
+      const dir = new PIXI.Point(e.data.global.x - this.dragStatePos.x, e.data.global.y - this.dragStatePos.y)
+      if (Math.sqrt(dir.x * dir.x + dir.y * dir.y) < this.context.setting.pointSize) {
+        if (!this.mouseOverNode) {
+          this.context.controller.change('Basic')
+        }
+      } else {
+        this.helpLine!.clear()
+        const modified = new Map<SimplePath, SimpleNode[]>()
+        this.context.selectedNode.forEach((node) => {
+          const currPath = this.context.owner.get(node)!
+          if (modified.get(currPath) === undefined) {
+            modified.set(currPath, [])
+          }
+          modified.get(currPath)!.push(node)
+        })
+        modified.forEach((nodes, path) => {
+          nodes.forEach(node => path.MovePoints(node, dir))
+          path.drawFill()
+        })
+        this.drawSelectedNode()
+      }
     }
     this.onMouseMove = function (e:PIXI.interaction.InteractionEvent) {
       if (!this.draging) return
       const dir = new PIXI.Point(e.data.global.x - this.dragStatePos.x, e.data.global.y - this.dragStatePos.y)
-      const newPosMap = new Map<SimpleNode,PIXI.Point>()
+      if (Math.sqrt(dir.x * dir.x + dir.y * dir.y) < this.context.setting.pointSize) return
+      const newPosMap = new Map<SimpleNode, PIXI.Point>()
       this.context.selectedNode.forEach((node) => {
         newPosMap.set(node, new PIXI.Point(node.data.x + dir.x, node.data.y + dir.y))
       })
@@ -109,7 +126,6 @@ export class StateSelected extends State {
     }
     this.onMouseOutHandler = this.onMouseOut.bind(this)
     this.onKeyUpHandler = this.onKeyUp.bind(this)
-    this.onClickHandler = this.onClick.bind(this)
     this.onClickNodeHandler = this.onClickNode.bind(this)
     this.onMouseOverHandler = this.onMouseOver.bind(this)
     this.onMouseDownHandler = this.onMouseDown.bind(this)
@@ -166,7 +182,6 @@ export class StateSelected extends State {
     const offset = rectSize * 0.5
     this.helpRect!.drawRect(this.context.selectedNode[0].data.x - offset, this.context.selectedNode[0].data.y - offset, rectSize, rectSize)
     // Event
-    this.context.app.renderer.view.addEventListener('click', this.onClickHandler)
     this.context.app.renderer.plugins.interaction.addListener('mouseup', this.onMouseUpHandler)
     this.context.app.renderer.plugins.interaction.addListener('mousedown', this.onMouseDownHandler)
     this.context.app.renderer.plugins.interaction.addListener('mousemove', this.onMouseMoveHandler)
@@ -189,14 +204,10 @@ export class StateSelected extends State {
        */
   exit (nextState:string) {
     if (this.context.app === null) return
-    if (this.helpRect !== undefined) {
-      this.helpRect.clear()
-    }
-    if (this.helpCircle !== undefined) {
-      this.helpCircle.clear()
-    }
+    this.helpRect!.clear()
+    this.helpCircle!.clear()
+    this.helpLine!.clear()
     // Remove all event
-    this.context.app.renderer.view.addEventListener('click', this.onClickHandler)
     this.context.app.renderer.plugins.interaction.removeListener('mouseup', this.onMouseUpHandler)
     this.context.app.renderer.plugins.interaction.removeListener('mousedown', this.onMouseDownHandler)
     this.context.app.renderer.plugins.interaction.removeListener('mousemove', this.onMouseMoveHandler)
