@@ -1,6 +1,7 @@
 
 import * as PIXI from 'pixi.js'
 import { Context } from './context'
+import { SimpleNode } from './simplePath';
 import { ConcreteState, State } from './state'
 /**
    * The class describes the state of editor when a line should be inserted
@@ -45,7 +46,7 @@ export class StateSelected extends State {
         case 'delete':
           this.context.controller.change('Basic')
           break
-        case 'shift':
+        case 'Shift':
           this.shiftPress = false
           break
         default:
@@ -88,17 +89,23 @@ export class StateSelected extends State {
     this.onMouseMove = function (e:PIXI.interaction.InteractionEvent) {
       if (!this.draging) return
       const dir = new PIXI.Point(e.data.global.x - this.dragStatePos.x, e.data.global.y - this.dragStatePos.y)
+      const newPosMap = new Map<SimpleNode,PIXI.Point>()
+      this.context.selectedNode.forEach((node) => {
+        newPosMap.set(node, new PIXI.Point(node.data.x + dir.x, node.data.y + dir.y))
+      })
       this.helpLine!.clear()
       this.helpLine!.lineStyle(this.context.setting.helpLineWidth, this.context.setting.helpLineColor, this.context.setting.helpLineAlpha)
       this.context.selectedNode.forEach((node) => {
-        const newPos = new PIXI.Point(node.data.x + dir.x, node.data.y + dir.y)
-        this.helpLine!.moveTo(node.prev.data.x, node.prev.data.y)
+        const prevPos = newPosMap.has(node.prev) ? newPosMap.get(node.prev)! : node.prev.data
+        const newPos = newPosMap.get(node)!
+        const nextPos = newPosMap.has(node.next) ? newPosMap.get(node.next)! : node.next.data
+        this.helpLine!.moveTo(prevPos.x, prevPos.y)
         this.helpLine!.lineTo(newPos.x, newPos.y)
-        this.helpLine!.lineTo(node.next.data.x, node.next.data.y)
+        this.helpLine!.lineTo(nextPos.x, nextPos.y)
       })
     }
     this.onKeyDown = function (event:KeyboardEvent) {
-      if (event.key === 'shift') this.shiftPress = true
+      if (event.key === 'Shift') this.shiftPress = true
     }
     this.onMouseOutHandler = this.onMouseOut.bind(this)
     this.onKeyUpHandler = this.onKeyUp.bind(this)
