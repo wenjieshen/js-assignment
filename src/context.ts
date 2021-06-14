@@ -26,9 +26,9 @@ export interface Context{
     editingPath:SimplePath|null
     selectedNode:SimpleNode[]
     controller:StateController
-    map2PIXI:Map<SimpleNode, PIXI.Graphics>
-    map2Node:Map<PIXI.DisplayObject, SimpleNode>
-    owner:Map<SimpleNode, SimplePath>
+    map2PIXI:WeakMap<SimpleNode, PIXI.Graphics>
+    map2Node:WeakMap<PIXI.DisplayObject, SimpleNode>
+    owner:WeakMap<SimpleNode, SimplePath>
     pointTree?:Quadtree|null
     paths:SimplePath[]
     setting:Setting

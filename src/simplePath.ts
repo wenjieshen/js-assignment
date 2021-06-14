@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js'
-import Quadtree, { Rect } from '@timohausmann/quadtree-js'
 
 class SimpleNode {
     data:PIXI.Point;
@@ -32,9 +31,6 @@ class SimpleNode {
       this.nextVertex.prevVertex = node
       this.nextVertex = node
     }
-}
-interface PointTreeNode extends Rect {
-  point:SimpleNode
 }
 class SimpleLine {
   p0: SimpleNode;
@@ -88,7 +84,7 @@ export interface PathViewSetting{
 class SimplePath {
     head:SimpleNode;
     tail:SimpleNode;
-    count = 0
+    count = 1 // There should be always a point here
     vertexKey = 0
     nodes = new Set<SimpleNode>();
     paint:PIXI.Graphics;
@@ -113,15 +109,12 @@ class SimplePath {
       this.drawLines()
     }
 
-    addNewPoint (coord:PIXI.Point, pointTree: Quadtree) {
+    addNewPoint (coord:PIXI.Point) {
       const node = new SimpleNode(coord)
       // Insert into my data structure
       this.nodes.add(node)
       this.tail.insert(node)
       this.tail = this.tail.next
-      // Insert into quadtree
-      const pointTreeNode:PointTreeNode = { x: node.data.x, y: node.data.y, width: 1, height: 1, point: node }
-      pointTree.insert(pointTreeNode)
       // Calulate AABB
       this.aabbMax.x = Math.max(this.aabbMax.x, coord.x); this.aabbMax.y = Math.max(this.aabbMax.x, coord.y)
       this.aabbMin.x = Math.min(this.aabbMin.x, coord.x); this.aabbMin.y = Math.min(this.aabbMin.x, coord.y)
@@ -187,13 +180,6 @@ class SimplePath {
       const currLine = new SimpleLine(this.tail, this.tail.next)
       this.addLines(currLine)
       this.drawFill()
-    }
-
-    insertDataIntoTree (pointTree: Quadtree) {
-      this.nodes.forEach((node) => {
-        const pointTreeNode:PointTreeNode = { x: node.data.x, y: node.data.y, width: 1, height: 1, point: node }
-        pointTree.insert(pointTreeNode)
-      })
     }
 
     setStatus () {
@@ -291,16 +277,14 @@ class SimplePath {
       this.paint.endFill()
     }
 
-    rebuildLine (head:SimpleNode, forward:boolean) {
-      let curr = head
-      const arr = []
+    removeIntersections (start: SimpleNode, end: SimpleNode, forward:boolean) {
+      let curr = start
+      const isec = []
       do {
-        if (curr.isVertex) {
-          arr.push(curr)
-        }
+        if (curr.isVertex) isec.push(curr)
         curr = forward ? curr.nextVertex : curr.prevVertex
-      } while (curr.isVertex)
-      arr.forEach(element => {
+      } while (curr !== end)
+      isec.forEach(element => {
         const neighbor = this.vertexPair.get(element)!
         neighbor.prevVertex.nextVertex = neighbor.nextVertex
         neighbor.nextVertex.prevVertex = neighbor.prevVertex
@@ -310,28 +294,88 @@ class SimplePath {
         this.vertexPair.delete(element)
         this.intersectedVertices.delete(element.key!)
       })
-      curr = head
+    }
+
+    rebuildLine (head:SimpleNode, forward:boolean) {
+      this.removeIntersections(head, forward ? head.next : head.prev, forward)
+      let curr = head
       this.lines.clear()
       if (forward) {
         do {
           this.lines.add(new SimpleLine(curr.prevVertex, curr))
           curr = curr.prevVertex
         } while (curr !== head.next)
-        this.addLines(new SimpleLine(head, head.next))
       } else {
         do {
           this.lines.add(new SimpleLine(curr, curr.nextVertex))
           curr = curr.prevVertex
         } while (curr !== head.next)
-        this.addLines(new SimpleLine(head.prev,head))
       }
     }
 
-    MovePoints (modifiedNode:SimpleNode, dir:PIXI.Point) {
+    movePoint (modifiedNode:SimpleNode, dir:PIXI.Point) {
       modifiedNode.data.x += dir.x
       modifiedNode.data.y += dir.y
       this.rebuildLine(modifiedNode, true)
+      this.addLines(new SimpleLine(modifiedNode, modifiedNode.next))
       this.rebuildLine(modifiedNode, false)
+      this.addLines(new SimpleLine(modifiedNode.prev, modifiedNode))
+    }
+
+    refreshOpenPath () {
+      let curr = this.head
+      this.lines.clear()
+      while (curr !== this.tail) {
+        this.lines.add(new SimpleLine(curr, curr.nextVertex))
+        curr = curr.nextVertex
+      }
+    }
+
+    deletePtFromClosed (deletedNode:SimpleNode) {
+      this.removeIntersections(deletedNode.prev, deletedNode.next, true)
+      this.tail = deletedNode.prev
+      this.head = deletedNode.next
+      this.tail.next = this.head
+      this.head.prev = this.tail
+      this.tail.nextVertex = this.head
+      this.head.prevVertex = this.tail
+      this.refreshOpenPath()
+      this.nodes.delete(deletedNode)
+      this.isClosed = false
+    }
+
+    deletePtFromOpened (deletedNode:SimpleNode) {
+      if (this.head === deletedNode) {
+        this.removeIntersections(deletedNode, deletedNode.next, true)
+        this.head = this.head.next
+        this.tail.next = this.head
+        this.head.prev = this.tail
+        this.tail.nextVertex = this.head
+        this.head.prevVertex = this.tail
+      } else if (this.tail === deletedNode) {
+        this.removeIntersections(deletedNode, deletedNode.prev, false)
+        this.tail = this.tail.prev
+        this.tail.next = this.head
+        this.head.prev = this.tail
+        this.tail.nextVertex = this.head
+        this.head.prevVertex = this.tail
+      } else {
+        this.removeIntersections(deletedNode.prev, deletedNode.next, true)
+        deletedNode.prev.next = deletedNode.next
+        deletedNode.next.prev = deletedNode.prev
+        deletedNode.prev.nextVertex = deletedNode.nextVertex
+        deletedNode.next.prevVertex = deletedNode.prevVertex
+      }
+      this.refreshOpenPath()
+      this.nodes.delete(deletedNode)
+    }
+
+    deletePoint (deletedNode:SimpleNode) {
+      if (this.isClosed) {
+        this.deletePtFromClosed(deletedNode)
+      } else {
+        this.deletePtFromOpened(deletedNode)
+      }
     }
 }
 export {

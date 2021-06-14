@@ -3,6 +3,7 @@ import * as PIXI from 'pixi.js'
 import { Context } from './context'
 import { SimpleNode, SimplePath } from './simplePath'
 import { ConcreteState, State } from './state'
+import { DeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
@@ -42,8 +43,34 @@ export class StateSelected extends State {
       if (this.context.app === null) return
       if (e.defaultPrevented) return
       switch (e.key) {
-        case 'Delete':
+        case 'Delete': {
+          const modified = new Map<SimplePath, SimpleNode[]>()
+          const remainNodes = new Map<SimplePath, number>()
+          this.context.selectedNode.forEach((node) => {
+            const currPath = this.context.owner.get(node)!
+            const currEntity = this.context.map2PIXI.get(node)!
+            this.context.map2Node.delete(currEntity)
+            this.context.app?.stage.removeChild(currEntity)
+            this.context.owner.delete(node)
+            if (modified.get(currPath) === undefined) modified.set(currPath, [])
+            if (remainNodes.get(currPath) === undefined) remainNodes.set(currPath, currPath.count)
+            modified.get(currPath)!.push(node)
+            const remain = remainNodes.get(currPath)! - 1
+            remainNodes.set(currPath, remain)
+          })
+          // Refresh by path
+          modified.forEach((nodes, path) => {
+            if (remainNodes.get(path)! < 2) {
+              DeletePath(this.context, path)
+              return
+            }
+            nodes.forEach(node => {
+              path.deletePoint(node)
+            })
+            path.drawLines()
+          })
           this.context.controller.change('Basic')
+        }
           break
         case 'Shift':
           this.shiftPress = false
@@ -79,6 +106,7 @@ export class StateSelected extends State {
       this.dragStatePos.copyFrom(e.data.global)
     }
     this.onMouseUp = function (e:PIXI.interaction.InteractionEvent) {
+      if (!this.draging) return
       this.draging = false
       const dir = new PIXI.Point(e.data.global.x - this.dragStatePos.x, e.data.global.y - this.dragStatePos.y)
       if (Math.sqrt(dir.x * dir.x + dir.y * dir.y) < this.context.setting.pointSize) {
@@ -87,17 +115,23 @@ export class StateSelected extends State {
         }
       } else {
         this.helpLine!.clear()
+        // Collect paths for reducing draw calls
         const modified = new Map<SimplePath, SimpleNode[]>()
         this.context.selectedNode.forEach((node) => {
+          this.context.map2PIXI.get(node)!.x += dir.x
+          this.context.map2PIXI.get(node)!.y += dir.y
           const currPath = this.context.owner.get(node)!
-          if (modified.get(currPath) === undefined) {
-            modified.set(currPath, [])
-          }
+          if (modified.get(currPath) === undefined) modified.set(currPath, [])
           modified.get(currPath)!.push(node)
         })
+        // Refresh by path
         modified.forEach((nodes, path) => {
-          nodes.forEach(node => path.MovePoints(node, dir))
-          path.drawFill()
+          nodes.forEach(node => path.movePoint(node, dir))
+          if (path.isClosed) {
+            path.drawFill()
+          } else {
+            path.drawLines()
+          }
         })
         this.drawSelectedNode()
       }

@@ -3,7 +3,7 @@ import * as PIXI from 'pixi.js'
 import { Context } from './context'
 import { State, ConcreteState } from './state'
 import { SimplePath, SimpleNode } from './stateController'
-import { BeforeDeletePath } from './utility'
+import { DeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
@@ -39,7 +39,7 @@ export class StateEditPath extends State {
         }
         if (e.key === 'Esc' || e.key === 'Escape') {
           if (this.context.editingPath!.count === 1) {
-            BeforeDeletePath(this.context, this.context.editingPath!)
+            DeletePath(this.context, this.context.editingPath!)
             this.context.editingPath = null
           }
           this.context.controller.change('Basic')
@@ -48,9 +48,9 @@ export class StateEditPath extends State {
       this.onClick = function () {
         if (this.context.app === null) return
         // Initilize container
-        const map2PIXI:Map<SimpleNode, PIXI.Graphics> = this.context.map2PIXI
-        const map2Node:Map<PIXI.DisplayObject, SimpleNode> = this.context.map2Node
-        const owner:Map<SimpleNode, SimplePath> = this.context.owner
+        const map2PIXI:WeakMap<SimpleNode, PIXI.Graphics> = this.context.map2PIXI
+        const map2Node:WeakMap<PIXI.DisplayObject, SimpleNode> = this.context.map2Node
+        const owner:WeakMap<SimpleNode, SimplePath> = this.context.owner
         // Create new entity of engine
         const mousePos = this.context.app.renderer.plugins.interaction.mouse.global
         const newEntity = new PIXI.Graphics()
@@ -59,7 +59,7 @@ export class StateEditPath extends State {
         newEntity.hitArea = new PIXI.Circle(0, 0, this.context.setting.pointSize * this.context.setting.hitScale)
         this.context.app.stage.addChild(newEntity)
         // Add the entity to my path
-        const node = this.context.editingPath!.addNewPoint(new PIXI.Point(newEntity.x, newEntity.y), this.context.pointTree!)
+        const node = this.context.editingPath!.addNewPoint(new PIXI.Point(newEntity.x, newEntity.y))
         map2PIXI.set(node, newEntity)
         map2Node.set(newEntity, node)
         owner.set(node, this.context.editingPath!)

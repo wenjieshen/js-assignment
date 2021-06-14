@@ -3,7 +3,7 @@ import * as PIXI from 'pixi.js'
 import { Context } from './context'
 import { State, ConcreteState } from './state'
 import { SimplePath } from './stateController'
-import { BeforeDeletePath } from './utility'
+import { DeletePath } from './utility'
 /**
    * The class describes the state of editor when a line should be inserted
    */
@@ -34,7 +34,7 @@ export class StateClosePath extends State {
         if (e.key === 'Esc' || e.key === 'Escape') {
           if (this.context.app === null) return
           if (this.context.editingPath!.count === 1) {
-            BeforeDeletePath(this.context, this.context.editingPath!)
+            DeletePath(this.context, this.context.editingPath!)
             this.context.editingPath = null
           }
           this.context.controller.change('Basic')
