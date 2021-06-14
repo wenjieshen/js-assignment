@@ -9,5 +9,6 @@ The primary data structure is a double-linked list storing points for keeping to
 - Add : O(n) if a point adds to a path with n points
 - Remove : O(n) if a point is removed to a path that remains n points
 - Move points : O(nm) if n points move in a path with m points
+- 1 drawcall per path ![截圖 2021-06-14 下午2 45 02](https://user-images.githubusercontent.com/9885145/121874750-3e2f0c00-cd3a-11eb-9cfb-fcdaac6ea03a.png)
 
 Envirment is cloned from https://github.com/GuillaumeDesforges/pixijs-typescript-starter
